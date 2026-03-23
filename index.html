@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>王者荣耀游戏预约系统 - 大神带玩预约平台</title>
+    <title>王者荣耀预约系统 | 跨设备实时同步版</title>
     <style>
         * {
             margin: 0;
@@ -193,8 +193,15 @@
             color: #e74c3c;
             font-size: 0.8rem;
         }
-        .success-msg {
-            color: #2ecc71;
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #f39c12;
+        }
+        .sync-tip {
+            font-size: 0.7rem;
+            color: #aaa;
+            margin-top: 8px;
         }
     </style>
 </head>
@@ -202,315 +209,278 @@
 <div id="app"></div>
 
 <script>
-    let db = {
-        users: [],
-        bookings: [],
+    // ======================= 前后端API配置 =======================
+    // 请根据实际部署的后端地址修改 BASE_URL
+    const BASE_URL = ''; // 如果后端与前端同域则留空，否则填写完整地址如 'http://your-server.com/api'
+    const API = {
+        // 用户相关
+        getUser: (nickname) => `${BASE_URL}/api/user?nickname=${encodeURIComponent(nickname)}`,
+        registerUser: () => `${BASE_URL}/api/user/register`,
+        getAllUsers: () => `${BASE_URL}/api/users`,
+        updateUserLevel: () => `${BASE_URL}/api/user/level`,
+        // 预约相关
+        getBookings: (weekStart) => `${BASE_URL}/api/bookings?weekStart=${weekStart}`,
+        createBooking: () => `${BASE_URL}/api/bookings`,
+        cancelBooking: (id) => `${BASE_URL}/api/bookings/${id}`,
+        modifyBookingSlot: (id) => `${BASE_URL}/api/bookings/${id}/slot`,
+        deleteBookingByAdmin: (id) => `${BASE_URL}/api/bookings/${id}`,
+        // 时段相关 (后端动态生成)
+        getSlots: (weekStart) => `${BASE_URL}/api/slots?weekStart=${weekStart}`,
     };
 
-    const ADMIN_NICKNAME = "楠小小风 865370";
-    let currentUser = null;
-    let currentAdminPanelTab = "bookingList";
-
-    function saveData() {
-        localStorage.setItem("game_booking_db", JSON.stringify({
-            users: db.users,
-            bookings: db.bookings
-        }));
-    }
-
-    function loadData() {
-        const raw = localStorage.getItem("game_booking_db");
-        if(raw) {
-            try {
-                const data = JSON.parse(raw);
-                db.users = data.users || [];
-                db.bookings = data.bookings || [];
-            } catch(e) {}
-        }
-        if(!db.users.find(u => u.nickname === ADMIN_NICKNAME)) {
-            db.users.push({
-                nickname: ADMIN_NICKNAME,
-                level: "管理员",
-                effectiveCount: 0,
-                manualLevel: "管理员"
-            });
-        }
-        db.users.forEach(u => {
-            if(!u.level) u.level = "普通用户";
-            if(u.effectiveCount === undefined) u.effectiveCount = 0;
+    // 辅助函数：fetch 封装，自动处理响应
+    async function request(url, options = {}) {
+        const response = await fetch(url, {
+            headers: { 'Content-Type': 'application/json' },
+            ...options,
         });
-        saveData();
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.message || `HTTP ${response.status}`);
+        }
+        return response.json();
     }
 
-    function calcLevelByEffective(count) {
-        if(count >= 50) return "SVIP用户";
-        if(count >= 25) return "VIP用户";
-        if(count >= 5) return "高级用户";
-        return "普通用户";
+    // 全局状态（仅用于UI，数据实际从后端获取）
+    let currentUser = null;        // 当前登录用户对象 { nickname, level, effectiveCount }
+    let currentWeekSlots = [];     // 当前周时段列表
+    let allBookings = [];           // 所有预约记录
+    let normalUsers = [];           // 普通用户列表（管理员用）
+    let currentAdminTab = "bookingList";
+
+    // ========== 核心业务逻辑（调用后端） ==========
+    // 获取当前周的起始日期（周一），用于后端查询
+    function getCurrentWeekStart() {
+        const now = new Date();
+        const day = now.getDay();
+        const diff = (day === 0 ? -6 : 1 - day);
+        const monday = new Date(now);
+        monday.setDate(now.getDate() + diff);
+        monday.setHours(0,0,0,0);
+        // 若超过本周日22:00，则展示下周
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(22,0,0,0);
+        if (now >= sunday) {
+            monday.setDate(monday.getDate() + 7);
+        }
+        return monday.toISOString().split('T')[0];
     }
 
-    function syncUserLevelByTimes(nickname) {
-        const user = db.users.find(u => u.nickname === nickname);
-        if(!user || user.nickname === ADMIN_NICKNAME) return;
-        const newLevel = calcLevelByEffective(user.effectiveCount);
-        if(user.level !== newLevel) {
-            user.level = newLevel;
-            saveData();
+    // 刷新所有数据：用户信息、时段、预约记录、用户列表（管理员）
+    async function refreshAllData() {
+        if (!currentUser) return;
+        try {
+            const weekStart = getCurrentWeekStart();
+            // 并行请求
+            const [userRes, slotsRes, bookingsRes] = await Promise.all([
+                request(API.getUser(currentUser.nickname)),
+                request(API.getSlots(weekStart)),
+                request(API.getBookings(weekStart))
+            ]);
+            currentUser = userRes.data;
+            currentWeekSlots = slotsRes.data;
+            allBookings = bookingsRes.data;
+
+            // 如果是管理员，额外获取所有用户列表
+            if (currentUser.nickname === "楠小小风 865370") {
+                const usersRes = await request(API.getAllUsers());
+                normalUsers = usersRes.data.filter(u => u.nickname !== "楠小小风 865370");
+            }
+        } catch (err) {
+            console.error("刷新数据失败:", err);
+            alert("数据同步失败，请检查网络或后端服务是否正常。\n" + err.message);
         }
     }
 
-    function adminSetLevel(nickname, newLevel) {
-        const user = db.users.find(u => u.nickname === nickname);
-        if(!user || user.nickname === ADMIN_NICKNAME) return false;
-        user.level = newLevel;
-        saveData();
-        return true;
+    // 登录/注册
+    async function login(nickname) {
+        try {
+            const res = await request(API.registerUser(), {
+                method: 'POST',
+                body: JSON.stringify({ nickname })
+            });
+            if (res.success) {
+                currentUser = res.data;
+                await refreshAllData();
+                renderApp();
+            } else {
+                alert(res.message);
+            }
+        } catch (err) {
+            alert("登录失败：" + err.message);
+        }
     }
 
-    function getUserWeeklyRemaining(nickname) {
-        if(nickname === ADMIN_NICKNAME) return Infinity;
-        const user = db.users.find(u => u.nickname === nickname);
-        if(!user) return 0;
-        let limit = 0;
-        if(user.level === "普通用户") limit = 2;
-        else if(user.level === "高级用户") limit = 3;
-        else if(user.level === "VIP用户") limit = 4;
-        else if(user.level === "SVIP用户") limit = Infinity;
-        else limit = 2;
+    // 用户预约
+    async function createBooking(nickname, slotKey, mode, rankDetail) {
+        try {
+            const res = await request(API.createBooking(), {
+                method: 'POST',
+                body: JSON.stringify({ nickname, slotKey, mode, rankDetail })
+            });
+            alert(res.message);
+            if (res.success) {
+                await refreshAllData();
+                renderApp();
+            }
+        } catch (err) {
+            alert("预约失败：" + err.message);
+        }
+    }
 
-        const currentWeekSlots = generateCurrentWeekSlots();
-        const thisWeekBookingCount = db.bookings.filter(b => 
-            b.nickname === nickname && 
-            currentWeekSlots.some(slot => slot.key === b.slotKey) &&
-            b.status !== "cancelled"
-        ).length;
-        if(limit === Infinity) return "无限";
-        const remaining = limit - thisWeekBookingCount;
+    // 用户取消预约
+    async function cancelUserBooking(bookingId) {
+        if (!confirm("取消后不计入有效次数，释放名额，确定取消吗？")) return;
+        try {
+            const res = await request(API.cancelBooking(bookingId), { method: 'DELETE' });
+            alert(res.message);
+            if (res.success) {
+                await refreshAllData();
+                renderApp();
+            }
+        } catch (err) {
+            alert("取消失败：" + err.message);
+        }
+    }
+
+    // 管理员删除任意预约
+    async function adminDeleteBooking(bookingId) {
+        if (!confirm("删除该预约，将扣除用户有效次数，确定吗？")) return;
+        try {
+            const res = await request(API.deleteBookingByAdmin(bookingId), { method: 'DELETE' });
+            alert(res.message);
+            if (res.success) {
+                await refreshAllData();
+                renderAdminTabContent();
+            }
+        } catch (err) {
+            alert("删除失败：" + err.message);
+        }
+    }
+
+    // 管理员修改预约时段
+    async function adminModifyBooking(bookingId, newSlotKey) {
+        try {
+            const res = await request(API.modifyBookingSlot(bookingId), {
+                method: 'PUT',
+                body: JSON.stringify({ newSlotKey })
+            });
+            alert(res.message);
+            if (res.success) {
+                await refreshAllData();
+                renderAdminTabContent();
+            }
+        } catch (err) {
+            alert("修改失败：" + err.message);
+        }
+    }
+
+    // 管理员修改用户等级
+    async function adminUpdateLevel(nickname, newLevel) {
+        try {
+            const res = await request(API.updateUserLevel(), {
+                method: 'PUT',
+                body: JSON.stringify({ nickname, level: newLevel })
+            });
+            alert(res.message);
+            if (res.success) {
+                await refreshAllData();
+                renderAdminTabContent();
+            }
+        } catch (err) {
+            alert("修改等级失败：" + err.message);
+        }
+    }
+
+    // 管理员帮助预约
+    async function adminHelpBooking(nickname, slotKey, mode, rankDetail) {
+        try {
+            const res = await request(API.createBooking(), {
+                method: 'POST',
+                body: JSON.stringify({ nickname, slotKey, mode, rankDetail })
+            });
+            alert(res.message);
+            if (res.success) {
+                await refreshAllData();
+                renderAdminTabContent();
+            }
+        } catch (err) {
+            alert("帮助预约失败：" + err.message);
+        }
+    }
+
+    // ========== 辅助UI函数 ==========
+    // 获取用户本周剩余可约次数 (从后端数据计算)
+    function getUserRemainingThisWeek() {
+        if (!currentUser) return 0;
+        if (currentUser.nickname === "楠小小风 865370") return Infinity;
+        let limit = 2;
+        if (currentUser.level === "高级用户") limit = 3;
+        else if (currentUser.level === "VIP用户") limit = 4;
+        else if (currentUser.level === "SVIP用户") limit = Infinity;
+        if (limit === Infinity) return "无限";
+        const bookedCount = allBookings.filter(b => b.nickname === currentUser.nickname && b.status === "active").length;
+        const remaining = limit - bookedCount;
         return remaining > 0 ? remaining : 0;
     }
 
-    function canBookThisWeek(nickname) {
-        if(nickname === ADMIN_NICKNAME) return false;
-        const remaining = getUserWeeklyRemaining(nickname);
-        if(remaining === "无限") return true;
-        return remaining > 0;
-    }
-
-    function generateCurrentWeekSlots() {
+    // 检查时段是否可预约（容量、时间限制）
+    function isSlotAvailable(slot) {
+        if (!slot) return false;
         const now = new Date();
-        let baseDate = new Date();
-        const dayOfWeek = baseDate.getDay();
-        let monday = new Date(baseDate);
-        const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
-        monday.setDate(baseDate.getDate() + diffToMonday);
-        monday.setHours(0,0,0,0);
-        
-        let sundayThisWeek = new Date(monday);
-        sundayThisWeek.setDate(monday.getDate() + 6);
-        sundayThisWeek.setHours(22,0,0,0);
-        if(now >= sundayThisWeek) {
-            monday.setDate(monday.getDate() + 7);
-        }
-        
-        const slots = [];
-        for(let i = 0; i < 7; i++) {
-            const currentDate = new Date(monday);
-            currentDate.setDate(monday.getDate() + i);
-            const weekDay = currentDate.getDay();
-            const yyyymmdd = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(currentDate.getDate()).padStart(2,'0')}`;
-            const weekName = ["周日","周一","周二","周三","周四","周五","周六"][weekDay];
-            if(weekDay >= 1 && weekDay <= 5) {
-                const startTime = "21:30";
-                const endTime = "23:00";
-                const slotKey = `${yyyymmdd}_${weekDay}_${startTime}-${endTime}`;
-                slots.push({
-                    key: slotKey,
-                    date: yyyymmdd,
-                    weekName,
-                    start: startTime,
-                    end: endTime,
-                    display: `${yyyymmdd} 周一~五 ${startTime}-${endTime}`,
-                    rawStartDateTime: new Date(`${yyyymmdd}T${startTime}:00`),
-                    rawEndDateTime: new Date(`${yyyymmdd}T${endTime}:00`)
-                });
-            } 
-            if(weekDay === 6 || weekDay === 0) {
-                const periods = [
-                    ["09:30","12:00"], ["14:00","16:00"], ["17:20","21:20"], ["21:30","23:10"]
-                ];
-                periods.forEach(([startTime, endTime]) => {
-                    const slotKey = `${yyyymmdd}_${weekDay}_${startTime}-${endTime}`;
-                    slots.push({
-                        key: slotKey,
-                        date: yyyymmdd,
-                        weekName,
-                        start: startTime,
-                        end: endTime,
-                        display: `${yyyymmdd} ${weekName} ${startTime}-${endTime}`,
-                        rawStartDateTime: new Date(`${yyyymmdd}T${startTime}:00`),
-                        rawEndDateTime: new Date(`${yyyymmdd}T${endTime}:00`)
-                    });
-                });
-            }
-        }
-        return slots;
-    }
-
-    function getSlotBookCount(slotKey) {
-        return db.bookings.filter(b => b.slotKey === slotKey && b.status !== "cancelled").length;
-    }
-
-    function isUserBookedSlot(nickname, slotKey) {
-        return db.bookings.some(b => b.nickname === nickname && b.slotKey === slotKey && b.status !== "cancelled");
-    }
-
-    function isSlotAvailable(slot, now = new Date()) {
-        if(getSlotBookCount(slot.key) >= 2) return false;
-        if(now >= slot.rawStartDateTime) return false;
-        const deadline = new Date(slot.rawStartDateTime.getTime() - 12 * 60 * 60 * 1000);
-        if(now >= deadline) return false;
+        // 容量检查
+        const count = allBookings.filter(b => b.slotKey === slot.key && b.status === "active").length;
+        if (count >= 2) return false;
+        // 时段已开始
+        if (now >= new Date(slot.rawStartDateTime)) return false;
+        // 提前12小时截止
+        const deadline = new Date(new Date(slot.rawStartDateTime).getTime() - 12 * 60 * 60 * 1000);
+        if (now >= deadline) return false;
         return true;
     }
 
-    function addBooking(nickname, slotKey, mode, rankDetail) {
-        const user = db.users.find(u => u.nickname === nickname);
-        if(!user) return {success: false, msg: "用户不存在"};
-        if(nickname === ADMIN_NICKNAME) return {success: false, msg: "管理员账号不可预约，请使用帮助预约功能"};
-        if(!canBookThisWeek(nickname)) {
-            return {success: false, msg: `本周预约次数已达上限(${getUserWeeklyRemaining(nickname)}剩余0次)`};
-        }
-        const allSlots = generateCurrentWeekSlots();
-        const targetSlot = allSlots.find(s => s.key === slotKey);
-        if(!targetSlot) return {success: false, msg: "时段无效"};
-        if(!isSlotAvailable(targetSlot, new Date())) {
-            return {success: false, msg: "该时段已满员/已过期/已停止预约(开始前12h截止)"};
-        }
-        if(isUserBookedSlot(nickname, slotKey)) {
-            return {success: false, msg: "您已预约过该时段，不可重复预约"};
-        }
-        const newBooking = {
-            id: Date.now() + Math.random() + nickname,
-            nickname,
-            slotKey,
-            mode,
-            rankDetail,
-            createdAt: new Date().toISOString(),
-            status: "active"
-        };
-        db.bookings.push(newBooking);
-        user.effectiveCount += 1;
-        syncUserLevelByTimes(nickname);
-        saveData();
-        return {success: true, msg: "预约成功！"};
+    // 检查用户是否已预约该时段
+    function isUserBookedSlot(slotKey) {
+        return allBookings.some(b => b.nickname === currentUser.nickname && b.slotKey === slotKey && b.status === "active");
     }
 
-    function cancelBooking(bookingId, nickname) {
-        const booking = db.bookings.find(b => b.id == bookingId && b.nickname === nickname);
-        if(!booking) return false;
-        if(booking.status === "cancelled") return false;
-        booking.status = "cancelled";
-        const user = db.users.find(u => u.nickname === nickname);
-        if(user && user.effectiveCount > 0) user.effectiveCount -= 1;
-        syncUserLevelByTimes(nickname);
-        saveData();
-        return true;
-    }
-
-    function adminDeleteBooking(bookingId) {
-        const booking = db.bookings.find(b => b.id == bookingId);
-        if(!booking) return false;
-        if(booking.status === "cancelled") return false;
-        booking.status = "cancelled";
-        const user = db.users.find(u => u.nickname === booking.nickname);
-        if(user && user.effectiveCount > 0) user.effectiveCount -= 1;
-        syncUserLevelByTimes(booking.nickname);
-        saveData();
-        return true;
-    }
-
-    function adminModifyBookingSlot(bookingId, newSlotKey) {
-        const booking = db.bookings.find(b => b.id == bookingId);
-        if(!booking || booking.status === "cancelled") return false;
-        const allSlots = generateCurrentWeekSlots();
-        const targetSlot = allSlots.find(s => s.key === newSlotKey);
-        if(!targetSlot) return false;
-        if(getSlotBookCount(newSlotKey) >= 2) return false;
-        if(!isSlotAvailable(targetSlot, new Date())) return false;
-        const sameUserSlot = db.bookings.find(b => b.nickname === booking.nickname && b.slotKey === newSlotKey && b.status !== "cancelled" && b.id !== bookingId);
-        if(sameUserSlot) return false;
-        booking.slotKey = newSlotKey;
-        saveData();
-        return true;
-    }
-
-    function getNormalUsers() {
-        return db.users.filter(u => u.nickname !== ADMIN_NICKNAME);
-    }
-
-    function weeklyRefreshClean() {
-        const now = new Date();
-        const allSlots = generateCurrentWeekSlots();
-        const validSlotKeys = new Set(allSlots.map(s => s.key));
-        const toDelete = db.bookings.filter(b => !validSlotKeys.has(b.slotKey) && b.status !== "cancelled");
-        toDelete.forEach(booking => {
-            booking.status = "expired_auto";
-        });
-        saveData();
-    }
-
-    let currentRenderSlots = [];
-    function renderApp() {
-        const app = document.getElementById("app");
-        if(!currentUser) {
-            renderLoginScreen(app);
-            return;
-        }
-        if(currentUser.nickname === ADMIN_NICKNAME) {
-            renderAdminPanel(app);
-        } else {
-            renderUserPanel(app);
-        }
-    }
-
+    // 渲染登录界面
     function renderLoginScreen(app) {
         app.innerHTML = `
             <div class="container login-screen">
                 <div class="card">
-                    <div class="card-header">🎮 王者预约系统 · 登录</div>
+                    <div class="card-header">🎮 王者预约系统 · 实时同步版</div>
                     <div>
                         <label>游戏昵称</label>
                         <input type="text" id="loginNickname" placeholder="输入游戏昵称" autocomplete="off">
                         <button id="doLoginBtn" style="margin-top: 20px;">登录/注册</button>
                         <div id="loginMsg" class="error-msg"></div>
+                        <div class="sync-tip">✨ 跨设备数据实时同步，所有操作均与服务器交互</div>
                     </div>
                 </div>
             </div>
         `;
         document.getElementById("doLoginBtn").onclick = () => {
             const nick = document.getElementById("loginNickname").value.trim();
-            if(!nick) {document.getElementById("loginMsg").innerText="请输入昵称";return;}
-            let user = db.users.find(u => u.nickname === nick);
-            if(!user) {
-                user = { nickname: nick, level: "普通用户", effectiveCount: 0 };
-                db.users.push(user);
-                saveData();
+            if (!nick) {
+                document.getElementById("loginMsg").innerText = "请输入昵称";
+                return;
             }
-            currentUser = user;
-            renderApp();
+            login(nick);
         };
     }
 
-    function renderUserPanel(app) {
-        const slots = generateCurrentWeekSlots();
-        currentRenderSlots = slots;
-        const remaining = getUserWeeklyRemaining(currentUser.nickname);
+    // 用户主界面
+    async function renderUserPanel(app) {
+        const remaining = getUserRemainingThisWeek();
         const remainText = (remaining === "无限") ? "无限次" : `${remaining} 次`;
-        const myBookings = db.bookings.filter(b => b.nickname === currentUser.nickname && b.status !== "cancelled");
+        const myBookings = allBookings.filter(b => b.nickname === currentUser.nickname && b.status === "active");
         app.innerHTML = `
             <div class="container">
                 <div class="user-info-bar">
                     <div>🎮 ${currentUser.nickname} | 等级: ${currentUser.level} | 本周可预约: ${remainText}</div>
-                    <div><button id="logoutBtn" class="btn-outline">🚪 退出登录</button></div>
+                    <div><button id="logoutBtn" class="btn-outline">🚪 退出登录</button><button id="refreshBtn" class="btn-outline">🔄 刷新</button></div>
                 </div>
                 <div class="card">
                     <div class="card-header">📅 可预约时段 (容量2人/时段)</div>
@@ -523,28 +493,32 @@
             </div>
         `;
         document.getElementById("logoutBtn").onclick = () => { currentUser = null; renderApp(); };
+        document.getElementById("refreshBtn").onclick = async () => { await refreshAllData(); renderApp(); };
         renderSlotGrid();
         renderUserBookings(myBookings);
     }
 
     function renderSlotGrid() {
         const container = document.getElementById("slotGrid");
-        if(!container) return;
-        const now = new Date();
-        container.innerHTML = currentRenderSlots.map(slot => {
-            const count = getSlotBookCount(slot.key);
-            const available = isSlotAvailable(slot, now);
-            const disabled = !available || count>=2;
+        if (!container) return;
+        container.innerHTML = currentWeekSlots.map(slot => {
+            const count = allBookings.filter(b => b.slotKey === slot.key && b.status === "active").length;
+            const available = isSlotAvailable(slot);
+            const alreadyBooked = isUserBookedSlot(slot.key);
+            let disabled = !available || count >= 2 || alreadyBooked;
+            let btnText = "预约此时间段";
+            if (alreadyBooked) btnText = "已预约";
+            else if (!available) btnText = "不可预约";
             return `
                 <div class="slot-card">
                     <div class="slot-time">📆 ${slot.display}</div>
                     <div class="slot-info">👥 预约人数: ${count}/2</div>
-                    <div class="slot-info">⏰ ${available ? "可预约" : "不可约(满员/超时/提前12h截止)"}</div>
-                    <button class="book-btn" data-key="${slot.key}" ${disabled ? "disabled style='opacity:0.5'" : ""}>预约此时间段</button>
+                    <div class="slot-info">⏰ ${available ? "可预约" : (alreadyBooked ? "您已预约该时段" : "满员/超时/提前12h截止")}</div>
+                    <button class="book-btn" data-key="${slot.key}" ${disabled ? "disabled style='opacity:0.5'" : ""}>${btnText}</button>
                 </div>
             `;
         }).join("");
-        document.querySelectorAll(".book-btn").forEach(btn => {
+        document.querySelectorAll(".book-btn:not([disabled])").forEach(btn => {
             btn.onclick = () => {
                 const slotKey = btn.dataset.key;
                 showBookingModal(slotKey);
@@ -553,185 +527,203 @@
     }
 
     function showBookingModal(slotKey) {
-        const slot = currentRenderSlots.find(s => s.key === slotKey);
-        if(!slot) return;
-        const modalHtml = `
-            <div id="bookingModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:1000;">
-                <div class="card" style="width:350px;">
-                    <h3>预约时段</h3>
-                    <p>${slot.display}</p>
-                    <label>模式</label>
-                    <select id="modeSelect"><option>娱乐</option><option>技术</option></select>
-                    <label>详细段位 (如 最强王者20星)</label>
-                    <input id="rankDetailInput" placeholder="例: 至尊星耀5">
-                    <div style="display:flex; justify-content:space-between; margin-top:20px;">
-                        <button id="confirmBookBtn">确认预约</button>
-                        <button id="closeModalBtn">取消</button>
-                    </div>
+        const slot = currentWeekSlots.find(s => s.key === slotKey);
+        if (!slot) return;
+        const modalDiv = document.createElement('div');
+        modalDiv.id = "bookingModal";
+        modalDiv.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:1000;";
+        modalDiv.innerHTML = `
+            <div class="card" style="width:350px;">
+                <h3>预约时段</h3>
+                <p>${slot.display}</p>
+                <label>模式</label>
+                <select id="modeSelect"><option>娱乐</option><option>技术</option></select>
+                <label>详细段位 (如 最强王者20星)</label>
+                <input id="rankDetailInput" placeholder="例: 至尊星耀5">
+                <div style="display:flex; justify-content:space-between; margin-top:20px;">
+                    <button id="confirmBookBtn">确认预约</button>
+                    <button id="closeModalBtn">取消</button>
                 </div>
             </div>
         `;
-        document.body.insertAdjacentHTML("beforeend", modalHtml);
-        document.getElementById("closeModalBtn").onclick = () => document.getElementById("bookingModal")?.remove();
-        document.getElementById("confirmBookBtn").onclick = () => {
+        document.body.appendChild(modalDiv);
+        document.getElementById("closeModalBtn").onclick = () => modalDiv.remove();
+        document.getElementById("confirmBookBtn").onclick = async () => {
             const mode = document.getElementById("modeSelect").value;
             const rank = document.getElementById("rankDetailInput").value.trim() || "未填写";
-            const res = addBooking(currentUser.nickname, slotKey, mode, rank);
-            alert(res.msg);
-            document.getElementById("bookingModal")?.remove();
-            if(res.success) {
-                if(confirm("预约成功！是否继续预约？\n确定继续/取消返回首页")) {
-                    renderApp();
-                } else {
-                    renderApp();
-                }
-            } else {
-                renderApp();
-            }
+            await createBooking(currentUser.nickname, slotKey, mode, rank);
+            modalDiv.remove();
         };
     }
 
     function renderUserBookings(bookings) {
         const container = document.getElementById("myBookingsList");
-        if(!container) return;
-        if(bookings.length===0) { container.innerHTML = "<div>暂无预约记录</div>"; return;}
-        container.innerHTML = `<table><tr><th>时段</th><th>模式</th><th>段位</th><th>操作</th></tr>${
-            bookings.map(b => {
-                const slot = generateCurrentWeekSlots().find(s => s.key === b.slotKey);
-                const display = slot ? slot.display : b.slotKey;
-                return `<tr><td>${display}</td><td>${b.mode}</td><td>${b.rankDetail}</td><td><button class="cancel-btn" data-id="${b.id}">取消预约</button></td></tr>`;
-            }).join("")
-        }</table>`;
+        if (!container) return;
+        if (bookings.length === 0) { container.innerHTML = "<div>暂无预约记录</div>"; return; }
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>时段</th><th>模式</th><th>段位</th><th>操作</th></tr></thead>
+                <tbody>
+                    ${bookings.map(b => {
+                        const slot = currentWeekSlots.find(s => s.key === b.slotKey);
+                        const display = slot ? slot.display : b.slotKey;
+                        return `<tr>
+                            <td>${display}</td>
+                            <td>${b.mode}</td>
+                            <td>${b.rankDetail}</td>
+                            <td><button class="cancel-btn" data-id="${b.id}">取消预约</button></td>
+                        </tr>`;
+                    }).join("")}
+                </tbody>
+            </table>
+        `;
         document.querySelectorAll(".cancel-btn").forEach(btn => {
-            btn.onclick = () => {
-                if(confirm("取消预约后不计入有效预约次数，释放名额。确定取消？")){
-                    cancelBooking(btn.dataset.id, currentUser.nickname);
-                    renderApp();
-                }
-            };
+            btn.onclick = () => cancelUserBooking(btn.dataset.id);
         });
     }
 
-    function renderAdminPanel(app) {
-        const normalUsers = getNormalUsers();
+    // 管理员面板
+    async function renderAdminPanel(app) {
         app.innerHTML = `
             <div class="container">
                 <div class="user-info-bar">
-                    <div>🔧 管理员: ${ADMIN_NICKNAME} | 权限面板</div>
-                    <button id="adminLogoutBtn" class="btn-outline">退出登录</button>
+                    <div>🔧 管理员: ${currentUser.nickname} | 权限面板</div>
+                    <div><button id="adminLogoutBtn" class="btn-outline">退出登录</button><button id="adminRefreshBtn" class="btn-outline">🔄 刷新</button></div>
                 </div>
                 <div class="card">
                     <div class="admin-tabs" id="adminTabs">
-                        <button data-tab="bookingList" class="tab-btn active">📋 预约详情</button>
-                        <button data-tab="helpBook" class="tab-btn">🤝 帮助预约</button>
-                        <button data-tab="modifyBooking" class="tab-btn">✏️ 预约修改</button>
-                        <button data-tab="userManage" class="tab-btn">👥 用户等级管理</button>
+                        <button data-tab="bookingList" class="tab-btn ${currentAdminTab === 'bookingList' ? 'active' : ''}">📋 预约详情</button>
+                        <button data-tab="helpBook" class="tab-btn ${currentAdminTab === 'helpBook' ? 'active' : ''}">🤝 帮助预约</button>
+                        <button data-tab="modifyBooking" class="tab-btn ${currentAdminTab === 'modifyBooking' ? 'active' : ''}">✏️ 预约修改</button>
+                        <button data-tab="userManage" class="tab-btn ${currentAdminTab === 'userManage' ? 'active' : ''}">👥 用户等级管理</button>
                     </div>
                     <div id="adminTabContent"></div>
                 </div>
             </div>
         `;
         document.getElementById("adminLogoutBtn").onclick = () => { currentUser = null; renderApp(); };
+        document.getElementById("adminRefreshBtn").onclick = async () => { await refreshAllData(); renderAdminTabContent(); };
         document.querySelectorAll("[data-tab]").forEach(btn => {
             btn.onclick = () => {
-                document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-                currentAdminPanelTab = btn.dataset.tab;
-                renderAdminTabContent();
+                currentAdminTab = btn.dataset.tab;
+                renderAdminPanel(app);
             };
         });
         renderAdminTabContent();
     }
 
-    function renderAdminTabContent() {
+    async function renderAdminTabContent() {
         const container = document.getElementById("adminTabContent");
-        if(!container) return;
-        if(currentAdminPanelTab === "bookingList") {
-            const allActive = db.bookings.filter(b => b.status !== "cancelled");
-            container.innerHTML = `<h3>所有预约信息</h3><table><tr><th>玩家</th><th>时段</th><th>模式</th><th>段位</th></tr>${
-                allActive.map(b => {
-                    const slot = generateCurrentWeekSlots().find(s => s.key === b.slotKey);
+        if (!container) return;
+        if (currentAdminTab === "bookingList") {
+            const activeBookings = allBookings.filter(b => b.status === "active");
+            container.innerHTML = `<h3>所有预约信息</h3>
+                <table><thead><tr><th>玩家</th><th>时段</th><th>模式</th><th>段位</th></tr></thead><tbody>
+                ${activeBookings.map(b => {
+                    const slot = currentWeekSlots.find(s => s.key === b.slotKey);
                     const display = slot ? slot.display : b.slotKey;
                     return `<tr><td>${b.nickname}</td><td>${display}</td><td>${b.mode}</td><td>${b.rankDetail}</td></tr>`;
-                }).join("")
-            }</table>`;
-        }
-        else if(currentAdminPanelTab === "helpBook") {
+                }).join("")}
+                </tbody></table>`;
+        } 
+        else if (currentAdminTab === "helpBook") {
             container.innerHTML = `
                 <h3>帮助其他用户预约</h3>
-                <label>玩家昵称</label><input id="helpNickname">
+                <label>玩家昵称</label><input id="helpNickname" placeholder="必须已注册">
                 <label>选择时段</label><select id="helpSlotSelect"></select>
                 <label>模式</label><select id="helpMode"><option>娱乐</option><option>技术</option></select>
                 <label>段位详情</label><input id="helpRank">
                 <button id="doHelpBookBtn">代为预约</button>
                 <div id="helpMsg"></div>
             `;
-            const slots = generateCurrentWeekSlots();
             const select = document.getElementById("helpSlotSelect");
-            select.innerHTML = slots.map(s => `<option value="${s.key}">${s.display} (${getSlotBookCount(s.key)}/2)</option>`).join("");
-            document.getElementById("doHelpBookBtn").onclick = () => {
+            select.innerHTML = currentWeekSlots.map(s => `<option value="${s.key}">${s.display} (${allBookings.filter(b=>b.slotKey===s.key && b.status==="active").length}/2)</option>`).join("");
+            document.getElementById("doHelpBookBtn").onclick = async () => {
                 const nick = document.getElementById("helpNickname").value.trim();
                 const slotKey = document.getElementById("helpSlotSelect").value;
                 const mode = document.getElementById("helpMode").value;
                 const rank = document.getElementById("helpRank").value.trim() || "未填写";
-                if(!nick) { alert("输入昵称"); return; }
-                const targetUser = db.users.find(u => u.nickname === nick);
-                if(!targetUser) { alert("用户不存在，请先让该用户登录一次"); return; }
-                const res = addBooking(nick, slotKey, mode, rank);
-                document.getElementById("helpMsg").innerText = res.msg;
-                if(res.success) renderAdminTabContent();
+                if (!nick) { alert("请输入昵称"); return; }
+                await adminHelpBooking(nick, slotKey, mode, rank);
             };
         }
-        else if(currentAdminPanelTab === "modifyBooking") {
-            const allBookings = db.bookings.filter(b => b.status !== "cancelled");
-            container.innerHTML = `<h3>修改/删除预约 (帮助管理)</h3><div id="modifyList"></div>`;
+        else if (currentAdminTab === "modifyBooking") {
+            const activeBookings = allBookings.filter(b => b.status === "active");
+            container.innerHTML = `<h3>修改/删除预约</h3><div id="modifyList"></div>`;
             const modifyDiv = document.getElementById("modifyList");
-            modifyDiv.innerHTML = `<table><tr><th>玩家</th><th>时段</th><th>操作</th></tr>${
-                allBookings.map(b => {
-                    const slot = generateCurrentWeekSlots().find(s => s.key === b.slotKey);
+            modifyDiv.innerHTML = `<table><thead><tr><th>玩家</th><th>时段</th><th>操作</th></tr></thead><tbody>
+                ${activeBookings.map(b => {
+                    const slot = currentWeekSlots.find(s => s.key === b.slotKey);
                     const disp = slot ? slot.display : b.slotKey;
-                    return `<tr><td>${b.nickname}</td><td>${disp}</td><td><button class="delBookingBtn" data-id="${b.id}">❌删除</button> <button class="modSlotBtn" data-id="${b.id}">🕒改时段</button></td></tr>`;
-                }).join("")
-            }</table>`;
+                    return `<tr>
+                        <td>${b.nickname}</td>
+                        <td>${disp}</td>
+                        <td>
+                            <button class="delBookingBtn" data-id="${b.id}">❌删除</button>
+                            <button class="modSlotBtn" data-id="${b.id}">🕒改时段</button>
+                        </td>
+                    </tr>`;
+                }).join("")}
+                </tbody></table>`;
             document.querySelectorAll(".delBookingBtn").forEach(btn => {
-                btn.onclick = () => { if(confirm("删除后不计入有效次数")){ adminDeleteBooking(btn.dataset.id); renderAdminTabContent(); } };
+                btn.onclick = () => adminDeleteBooking(btn.dataset.id);
             });
             document.querySelectorAll(".modSlotBtn").forEach(btn => {
                 btn.onclick = async () => {
-                    const newSlotKey = prompt("输入新时段key (可查看上方预约详情时段列表的key,格式如2025-03-17_Mon_21:30-23:00)");
-                    if(newSlotKey && adminModifyBookingSlot(btn.dataset.id, newSlotKey)) alert("修改成功");
-                    else alert("修改失败(容量满/重复/时段无效)");
-                    renderAdminTabContent();
+                    const newSlotKey = prompt("输入新时段key (可从预约详情复制key，例如 2025-03-24_Mon_21:30-23:00)");
+                    if (newSlotKey) await adminModifyBooking(btn.dataset.id, newSlotKey);
                 };
             });
         }
-        else if(currentAdminPanelTab === "userManage") {
-            const users = getNormalUsers();
-            container.innerHTML = `<h3>用户等级管理</h3><table><tr><th>昵称</th><th>当前等级</th><th>有效预约次数</th><th>修改等级</th></tr>${
-                users.map(u => `<tr><td>${u.nickname}</td><td>${u.level}</td><td>${u.effectiveCount}</td><td><select id="levelSelect-${u.nickname}"><option>普通用户</option><option>高级用户</option><option>VIP用户</option><option>SVIP用户</option></select><button class="updateLevelBtn" data-nick="${u.nickname}">应用</button></td></tr>`).join("")
-            }</table>`;
-            users.forEach(u => {
+        else if (currentAdminTab === "userManage") {
+            container.innerHTML = `<h3>用户等级管理</h3>
+                <table><thead><tr><th>昵称</th><th>当前等级</th><th>有效预约次数</th><th>修改等级</th></tr></thead><tbody>
+                ${normalUsers.map(u => `
+                    <tr>
+                        <td>${u.nickname}</td>
+                        <td>${u.level}</td>
+                        <td>${u.effectiveCount}</td>
+                        <td>
+                            <select id="levelSelect-${u.nickname}">
+                                <option ${u.level==='普通用户'?'selected':''}>普通用户</option>
+                                <option ${u.level==='高级用户'?'selected':''}>高级用户</option>
+                                <option ${u.level==='VIP用户'?'selected':''}>VIP用户</option>
+                                <option ${u.level==='SVIP用户'?'selected':''}>SVIP用户</option>
+                            </select>
+                            <button class="updateLevelBtn" data-nick="${u.nickname}">应用</button>
+                        </td>
+                    </tr>
+                `).join("")}
+                </tbody></table>`;
+            normalUsers.forEach(u => {
                 const btn = document.querySelector(`.updateLevelBtn[data-nick="${u.nickname}"]`);
-                if(btn) btn.onclick = () => {
+                if (btn) btn.onclick = () => {
                     const select = document.getElementById(`levelSelect-${u.nickname}`);
-                    const newLevel = select.value;
-                    adminSetLevel(u.nickname, newLevel);
-                    renderAdminTabContent();
+                    adminUpdateLevel(u.nickname, select.value);
                 };
             });
         }
     }
 
-    function init() {
-        loadData();
-        weeklyRefreshClean();
-        renderApp();
-        setInterval(() => {
-            weeklyRefreshClean();
-            renderApp();
-        }, 60000);
+    // 主渲染入口
+    async function renderApp() {
+        const app = document.getElementById("app");
+        if (!currentUser) {
+            renderLoginScreen(app);
+            return;
+        }
+        // 显示加载状态
+        app.innerHTML = '<div class="loading">加载中...</div>';
+        await refreshAllData();
+        if (currentUser.nickname === "楠小小风 865370") {
+            await renderAdminPanel(app);
+        } else {
+            await renderUserPanel(app);
+        }
     }
-    init();
+
+    // 启动应用
+    renderApp().catch(console.error);
 </script>
 </body>
 </html>
