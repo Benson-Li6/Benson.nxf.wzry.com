@@ -175,7 +175,7 @@
                 </div>
             </div>
 
-            <!-- 4. 用户信息修改 → 新增 -->
+            <!-- 4. 用户信息修改 -->
             <div id="adminUserPage" class="admin-page">
                 <h3 class="font-bold mb-3">用户等级管理</h3>
                 <div class="overflow-x-auto">
@@ -226,7 +226,7 @@
         const d = new Date(date);
         const day = d.getDay() || 7;
         d.setDate(d.getDate() - day + 1);
-        d.setHours(0, 0, 0, 0);
+        d.setHours(0,0,0,0);
         return d.toISOString().split('T')[0];
     }
 
@@ -234,86 +234,98 @@
     function generateWeekSlots() {
         const now = new Date();
         const slots = [];
-        const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        const dayNames = ['周一','周二','周三','周四','周五','周六','周日'];
         const add = (now.getDay() === 0 && now.getHours() >= 22) ? 7 : 0;
-        for (let i = 0; i < 7; i++) {
+        for(let i=0;i<7;i++){
             const d = new Date();
             d.setDate(now.getDate() - now.getDay() + i + 1 + add);
             const date = d.toISOString().split('T')[0];
             const day = dayNames[i];
-            const isWeekend = i >= 5;
-            if (isWeekend) {
-                slots.push({ date, day, start: '09:30', end: '12:00' });
-                slots.push({ date, day, start: '14:00', end: '16:00' });
-                slots.push({ date, day, start: '17:20', end: '21:20' });
-                slots.push({ date, day, start: '21:30', end: '23:10' });
-            } else {
-                slots.push({ date, day, start: '21:30', end: '23:00' });
+            const isWeekend = i >=5;
+            if(isWeekend){
+                slots.push({date,day,start:'09:30',end:'12:00'});
+                slots.push({date,day,start:'14:00',end:'16:00'});
+                slots.push({date,day,start:'17:20',end:'21:20'});
+                slots.push({date,day,start:'21:30',end:'23:10'});
+            }else{
+                slots.push({date,day,start:'21:30',end:'23:00'});
             }
         }
         return slots;
     }
 
-    function getSlotTime(slot) {
-        const [h, m] = slot.start.split(':').map(Number);
+    function getSlotTime(slot){
+        const [h,m] = slot.start.split(':').map(Number);
         const dt = new Date(slot.date);
-        dt.setHours(h, m, 0, 0);
+        dt.setHours(h,m,0,0);
         return dt;
     }
 
-    function isSlotOpen(slot) {
+    function isSlotOpen(slot){
         const now = new Date();
         const st = getSlotTime(slot);
-        if (now >= st) return false;
-        const dead = new Date(st - 12 * 60 * 60 * 1000);
+        if(now >= st) return false;
+        const dead = new Date(st - 12*60*60*1000);
         return now < dead;
     }
 
-    function getSlotUsedCount(slot) {
-        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
-        return list.filter(r => r.date === slot.date && r.start === slot.start).length;
+    function getSlotUsedCount(slot){
+        const list = JSON.parse(localStorage.getItem('reservations')||'[]');
+        return list.filter(r=>r.date===slot.date&&r.start===slot.start).length;
+    }
+
+    // ==============================================
+    // 新增：判断用户是否已约过该时段
+    // ==============================================
+    function hasUserReservedAtSlot(name, date, start){
+        const list = JSON.parse(localStorage.getItem('reservations')||'[]');
+        return list.some(r=>
+            r.name === name &&
+            r.date === date &&
+            r.start === start
+        );
     }
 
     // 用户系统
-    function getUser(name) {
-        let users = JSON.parse(localStorage.getItem('users') || '[]');
-        let user = users.find(u => u.name === name);
-        if (!user) {
-            user = { name, level: '普通用户', total: 0 };
+    function getUser(name){
+        let users = JSON.parse(localStorage.getItem('users')||'[]');
+        let user = users.find(u=>u.name===name);
+        if(!user){
+            user = {name,level:'普通用户',total:0};
             users.push(user);
-            localStorage.setItem('users', JSON.stringify(users));
+            localStorage.setItem('users',JSON.stringify(users));
         }
         return user;
     }
 
-    function updateAutoLevel(name) {
-        let users = JSON.parse(localStorage.getItem('users') || '[]');
-        let idx = users.findIndex(u => u.name === name);
-        if (idx === -1) return;
+    function updateAutoLevel(name){
+        let users = JSON.parse(localStorage.getItem('users')||'[]');
+        let idx = users.findIndex(u=>u.name===name);
+        if(idx===-1) return;
         let n = users[idx].total;
         let lv = '普通用户';
-        if (n > 50) lv = 'SVIP用户';
-        else if (n > 25) lv = 'VIP用户';
-        else if (n > 5) lv = '高级用户';
+        if(n>50) lv='SVIP用户';
+        else if(n>25) lv='VIP用户';
+        else if(n>5) lv='高级用户';
         users[idx].level = lv;
-        localStorage.setItem('users', JSON.stringify(users));
+        localStorage.setItem('users',JSON.stringify(users));
     }
 
-    function getWeekReserveCount(name) {
-        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
+    function getWeekReserveCount(name){
+        const list = JSON.parse(localStorage.getItem('reservations')||'[]');
         const week = getWeekStart();
-        return list.filter(r => r.name === name && r.week === week).length;
+        return list.filter(r=>r.name===name&&r.week===week).length;
     }
 
-    function getMaxLimit(name) {
+    function getMaxLimit(name){
         const u = getUser(name);
-        if (u.level === 'SVIP用户') return 999;
-        if (u.level === 'VIP用户') return 4;
-        if (u.level === '高级用户') return 3;
+        if(u.level==='SVIP用户') return 999;
+        if(u.level==='VIP用户') return 4;
+        if(u.level==='高级用户') return 3;
         return 2;
     }
 
-    function showRemainTimes(name) {
+    function showRemainTimes(name){
         const used = getWeekReserveCount(name);
         const max = getMaxLimit(name);
         const rem = max - used;
@@ -322,25 +334,25 @@
     }
 
     // 普通用户时间段渲染
-    function renderUserSlots() {
+    function renderUserSlots(){
         const c = document.getElementById('userSlotContainer');
         const s = document.getElementById('userSlot');
         const slots = generateWeekSlots();
         c.innerHTML = '';
         s.innerHTML = '<option value="">选择预约时间段</option>';
-        slots.forEach((slot, i) => {
+        slots.forEach((slot,i)=>{
             const open = isSlotOpen(slot);
             const cnt = getSlotUsedCount(slot);
-            const full = cnt >= 2;
+            const full = cnt>=2;
             let txt = open ? (full ? '已满员' : '可预约') : '当前时间不开放';
             const div = document.createElement('div');
             div.className = 'bg-white rounded-xl p-4 card-shadow';
             div.innerHTML = `
             <div class="flex justify-between"><b>${slot.day}</b><span class="text-sm text-gray-500">${slot.date}</span></div>
             <div class="my-2">${slot.start} - ${slot.end}</div>
-            <div class="text-sm ${!open || full ? 'text-red-600' : 'text-green-600'}">${txt}</div>`;
+            <div class="text-sm ${!open||full?'text-red-600':'text-green-600'}">${txt}</div>`;
             c.appendChild(div);
-            if (open && !full) {
+            if(open&&!full){
                 const opt = document.createElement('option');
                 opt.value = i;
                 opt.textContent = `${slot.day} ${slot.date} ${slot.start}`;
@@ -350,12 +362,12 @@
     }
 
     // 管理员时间段选择框
-    function fillAdminSlotSelect(selId) {
+    function fillAdminSlotSelect(selId){
         const sel = document.getElementById(selId);
         const slots = generateWeekSlots();
         sel.innerHTML = '';
-        slots.forEach((slot, i) => {
-            if (isSlotOpen(slot) && getSlotUsedCount(slot) < 2) {
+        slots.forEach((slot,i)=>{
+            if(isSlotOpen(slot)&&getSlotUsedCount(slot)<2){
                 const opt = document.createElement('option');
                 opt.value = i;
                 opt.textContent = `${slot.day} ${slot.date} ${slot.start}`;
@@ -365,50 +377,50 @@
     }
 
     // 页面切换
-    function showAdminPage(key) {
-        document.querySelectorAll('.admin-page').forEach(el => el.style.display = 'none');
-        if (key === 'detail') {
-            document.getElementById('adminDetailPage').style.display = 'block';
+    function showAdminPage(key){
+        document.querySelectorAll('.admin-page').forEach(el=>el.style.display='none');
+        if(key==='detail'){
+            document.getElementById('adminDetailPage').style.display='block';
             renderAdminDetail();
-        } else if (key === 'help') {
-            document.getElementById('adminHelpPage').style.display = 'block';
+        }else if(key==='help'){
+            document.getElementById('adminHelpPage').style.display='block';
             fillAdminSlotSelect('helpSlot');
-        } else if (key === 'edit') {
-            document.getElementById('adminEditPage').style.display = 'block';
+        }else if(key==='edit'){
+            document.getElementById('adminEditPage').style.display='block';
             renderAdminEdit();
-        } else if (key === 'user') {
-            document.getElementById('adminUserPage').style.display = 'block';
+        }else if(key==='user'){
+            document.getElementById('adminUserPage').style.display='block';
             renderAdminUser();
         }
     }
 
     // 1. 预约详情
-    function renderAdminDetail() {
-        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
+    function renderAdminDetail(){
+        const list = JSON.parse(localStorage.getItem('reservations')||'[]');
         const slots = generateWeekSlots();
-        const html = list.map((r, i) => {
-            const slot = slots[r.slotIdx] || {};
+        const html = list.map((r,i)=>{
+            const slot = slots[r.slotIdx]||{};
             const u = getUser(r.name);
-            const time = slot.day ? `${slot.day} ${slot.date} ${slot.start}` : '已过期';
+            const time = slot.day?`${slot.day} ${slot.date} ${slot.start}`:'已过期';
             return `<tr>
                 <td class="p-2">${r.name}</td><td class="p-2">${u.level}</td>
                 <td class="p-2">${r.mode}</td><td class="p-2">${r.rank}</td><td class="p-2">${time}</td>
             </tr>`;
-        }).join('') || '<tr><td colspan="5" class="p-2 text-center">暂无预约</td></tr>';
+        }).join('')||'<tr><td colspan="5" class="p-2 text-center">暂无预约</td></tr>';
         document.getElementById('adminDetailList').innerHTML = html;
     }
 
     // 2. 预约修改
-    function renderAdminEdit() {
-        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
+    function renderAdminEdit(){
+        const list = JSON.parse(localStorage.getItem('reservations')||'[]');
         const slots = generateWeekSlots();
-        const html = list.map((r, idx) => {
-            const slot = slots[r.slotIdx] || {};
-            const oldTime = slot.day ? `${slot.day} ${slot.start}` : '已过期';
+        const html = list.map((r,idx)=>{
+            const slot = slots[r.slotIdx]||{};
+            const oldTime = slot.day?`${slot.day} ${slot.start}`:'已过期';
             let options = '';
-            slots.forEach((s, i) => {
-                if (isSlotOpen(s) && getSlotUsedCount(s) < 2) {
-                    options += `<option value="${i}" ${r.slotIdx == i ? 'selected' : ''}>${s.day} ${s.start}</option>`;
+            slots.forEach((s,i)=>{
+                if(isSlotOpen(s)&&getSlotUsedCount(s)<2){
+                    options+=`<option value="${i}" ${r.slotIdx==i?'selected':''}>${s.day} ${s.start}</option>`;
                 }
             });
             return `<tr>
@@ -420,77 +432,91 @@
                     <button onclick="adminDeleteReserve(${idx})" class="text-red-600">删除</button>
                 </td>
             </tr>`;
-        }).join('') || '<tr><td colspan="6" class="p-2 text-center">暂无预约</td></tr>';
+        }).join('')||'<tr><td colspan="6" class="p-2 text-center">暂无预约</td></tr>';
         document.getElementById('adminEditList').innerHTML = html;
     }
 
-    window.adminUpdateSlot = function (idx) {
-        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
+    window.adminUpdateSlot = function(idx){
+        const list = JSON.parse(localStorage.getItem('reservations')||'[]');
         const slots = generateWeekSlots();
         const newSlotIdx = document.querySelector(`.edit-slot-${idx}`).value;
-        if (newSlotIdx == null) return showStatus('请选择时间段', 'error');
+        if(newSlotIdx==null) return showStatus('请选择时间段','error');
         list[idx].slotIdx = parseInt(newSlotIdx);
         list[idx].date = slots[newSlotIdx].date;
         list[idx].start = slots[newSlotIdx].start;
-        localStorage.setItem('reservations', JSON.stringify(list));
+        localStorage.setItem('reservations',JSON.stringify(list));
         renderAdminEdit();
-        showStatus('时间段已修改', 'success');
+        showStatus('时间段已修改','success');
     }
 
-    window.adminDeleteReserve = function (idx) {
-        if (!confirm('确定删除？')) return;
-        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
-        list.splice(idx, 1);
-        localStorage.setItem('reservations', JSON.stringify(list));
+    // ==============================================
+    // 管理员删除预约 → 总预约数 -1，等级重新计算
+    // ==============================================
+    window.adminDeleteReserve = function(idx){
+        if(!confirm('确定删除？删除后不计入有效预约数')) return;
+        const list = JSON.parse(localStorage.getItem('reservations')||'[]');
+        const deleted = list[idx];
+        list.splice(idx,1);
+        localStorage.setItem('reservations',JSON.stringify(list));
+
+        // 被删的预约，用户总次数 -1
+        let users = JSON.parse(localStorage.getItem('users')||'[]');
+        let uidx = users.findIndex(x=>x.name===deleted.name);
+        if(uidx !== -1){
+            users[uidx].total = Math.max(0, users[uidx].total - 1);
+            updateAutoLevel(deleted.name);
+            localStorage.setItem('users',JSON.stringify(users));
+        }
+
         renderAdminEdit();
         renderAdminDetail();
-        showStatus('已删除', 'success');
+        renderAdminUser();
+        showStatus('已删除，该预约不计入有效次数','success');
     }
 
-    // 3. 用户信息修改 → 核心新增
-    function renderAdminUser() {
-        let users = JSON.parse(localStorage.getItem('users') || '[]');
-        users = users.filter(u => u.name !== '楠小小风865370');
-        const html = users.map((u, idx) => `
+    // 3. 用户信息修改
+    function renderAdminUser(){
+        let users = JSON.parse(localStorage.getItem('users')||'[]');
+        users = users.filter(u=>u.name!=='楠小小风865370');
+        const html = users.map((u,idx)=>`
         <tr>
             <td class="p-2">${u.name}</td>
             <td class="p-2">${u.total}</td>
             <td class="p-2">${u.level}</td>
             <td class="p-2">
-                <select class="border p-1 user-level-${idx}" onchange="adminSetUserLevel(${idx}, this.value)">
-                    <option value="普通用户" ${u.level === '普通用户' ? 'selected' : ''}>普通用户</option>
-                    <option value="高级用户" ${u.level === '高级用户' ? 'selected' : ''}>高级用户</option>
-                    <option value="VIP用户" ${u.level === 'VIP用户' ? 'selected' : ''}>VIP用户</option>
-                    <option value="SVIP用户" ${u.level === 'SVIP用户' ? 'selected' : ''}>SVIP用户</option>
+                <select class="border p-1 user-level-${idx}" onchange="adminSetUserLevel(${idx},this.value)">
+                    <option value="普通用户" ${u.level==='普通用户'?'selected':''}>普通用户</option>
+                    <option value="高级用户" ${u.level==='高级用户'?'selected':''}>高级用户</option>
+                    <option value="VIP用户" ${u.level==='VIP用户'?'selected':''}>VIP用户</option>
+                    <option value="SVIP用户" ${u.level==='SVIP用户'?'selected':''}>SVIP用户</option>
                 </select>
             </td>
-        </tr>`).join('') || '<tr><td colspan="4" class="p-2 text-center">暂无用户</td></tr>';
+        </tr>`).join('')||'<tr><td colspan="4" class="p-2 text-center">暂无用户</td></tr>';
         document.getElementById('adminUserList').innerHTML = html;
     }
 
-    window.adminSetUserLevel = function (idx, newLevel) {
-        let users = JSON.parse(localStorage.getItem('users') || '[]');
-        const filtered = users.filter(u => u.name !== '楠小小风865370');
+    window.adminSetUserLevel = function(idx,newLevel){
+        let users = JSON.parse(localStorage.getItem('users')||'[]');
+        const filtered = users.filter(u=>u.name!=='楠小小风865370');
         const targetName = filtered[idx].name;
-        users = users.map(u => {
-            if (u.name === targetName) u.level = newLevel;
+        users = users.map(u=>{
+            if(u.name===targetName) u.level = newLevel;
             return u;
         });
-        localStorage.setItem('users', JSON.stringify(users));
+        localStorage.setItem('users',JSON.stringify(users));
         renderAdminUser();
         renderAdminDetail();
-        showStatus('用户等级已修改', 'success');
+        showStatus('用户等级已修改','success');
 
-        // 如果该用户在线，同步刷新显示
         const loginUser = localStorage.getItem('loginUser');
-        if (loginUser === targetName) {
+        if(loginUser===targetName){
             document.getElementById('showLevel').textContent = newLevel;
             showRemainTimes(targetName);
         }
     }
 
     // 登录 & 退出
-    function logout() {
+    function logout(){
         localStorage.removeItem('loginUser');
         document.getElementById('loginBox').classList.remove('hidden');
         document.getElementById('userMain').classList.add('hidden');
@@ -498,23 +524,23 @@
         document.getElementById('userInfo').classList.add('hidden');
         document.getElementById('remainTip').classList.add('hidden');
         document.getElementById('logoutBtn').classList.add('hidden');
-        showStatus('已退出登录', 'success');
+        showStatus('已退出登录','success');
     }
 
     document.getElementById('logoutBtn').onclick = logout;
 
-    function afterLogin(name) {
+    function afterLogin(name){
         document.getElementById('loginBox').classList.add('hidden');
         document.getElementById('userInfo').classList.remove('hidden');
         document.getElementById('logoutBtn').classList.remove('hidden');
         document.getElementById('showName').textContent = name;
 
-        if (name === '楠小小风865370') {
+        if(name==='楠小小风865370'){
             document.getElementById('adminMain').classList.remove('hidden');
             document.getElementById('userMain').classList.add('hidden');
             document.getElementById('showLevel').textContent = '【管理员】';
             showAdminPage('detail');
-            showStatus('欢迎管理员', 'success');
+            showStatus('欢迎管理员','success');
             return;
         }
 
@@ -527,40 +553,48 @@
         renderUserSlots();
     }
 
-    document.getElementById('loginBtn').onclick = function () {
+    document.getElementById('loginBtn').onclick = function(){
         const name = document.getElementById('loginNick').value.trim();
-        if (!name) return showStatus('请输入昵称', 'error');
-        localStorage.setItem('loginUser', name);
+        if(!name) return showStatus('请输入昵称','error');
+        localStorage.setItem('loginUser',name);
         afterLogin(name);
     };
 
     // 普通用户预约
-    document.getElementById('userReserveForm').onsubmit = function (e) {
+    document.getElementById('userReserveForm').onsubmit = function(e){
         e.preventDefault();
         const name = document.getElementById('userNick').value.trim();
         const mode = document.getElementById('userMode').value;
         const rank = document.getElementById('userRank').value.trim();
         const slotIdx = document.getElementById('userSlot').value;
-        if (!mode || !rank || slotIdx === '') return showStatus('信息不全', 'error');
+        if(!mode||!rank||slotIdx==='') return showStatus('信息不全','error');
+
+        const slots = generateWeekSlots();
+        const slot = slots[slotIdx];
+
+        // ==============================================
+        // 同一用户同一时段只能约一次
+        // ==============================================
+        if(hasUserReservedAtSlot(name, slot.date, slot.start)){
+            return showStatus('你已预约过该时间段，不可重复预约','error');
+        }
 
         const week = getWeekStart();
         const used = getWeekReserveCount(name);
         const max = getMaxLimit(name);
-        if (used >= max) return showStatus(`本周上限(${used}/${max})`, 'error');
+        if(used >= max) return showStatus(`本周上限(${used}/${max})`,'error');
 
-        const slots = generateWeekSlots();
-        const slot = slots[slotIdx];
-        if (!isSlotOpen(slot)) return showStatus('当前时间不开放', 'error');
-        if (getSlotUsedCount(slot) >= 2) return showStatus('已满员', 'error');
+        if(!isSlotOpen(slot)) return showStatus('当前时间不开放','error');
+        if(getSlotUsedCount(slot)>=2) return showStatus('已满员','error');
 
-        let list = JSON.parse(localStorage.getItem('reservations') || '[]');
-        list.push({ name, mode, rank, slotIdx: parseInt(slotIdx), date: slot.date, start: slot.start, week });
-        localStorage.setItem('reservations', JSON.stringify(list));
+        let list = JSON.parse(localStorage.getItem('reservations')||'[]');
+        list.push({name,mode,rank,slotIdx:parseInt(slotIdx),date:slot.date,start:slot.start,week});
+        localStorage.setItem('reservations',JSON.stringify(list));
 
-        let users = JSON.parse(localStorage.getItem('users') || '[]');
-        let user = users.find(x => x.name === name);
-        if (user) { user.total++; updateAutoLevel(name); }
-        localStorage.setItem('users', JSON.stringify(users));
+        let users = JSON.parse(localStorage.getItem('users')||'[]');
+        let user = users.find(x=>x.name===name);
+        if(user){ user.total++; updateAutoLevel(name); }
+        localStorage.setItem('users',JSON.stringify(users));
 
         showRemainTimes(name);
         renderUserSlots();
@@ -568,33 +602,41 @@
     };
 
     // 管理员代约
-    document.getElementById('adminHelpForm').onsubmit = function (e) {
+    document.getElementById('adminHelpForm').onsubmit = function(e){
         e.preventDefault();
         const name = document.getElementById('helpNick').value.trim();
         const mode = document.getElementById('helpMode').value;
         const rank = document.getElementById('helpRank').value.trim();
         const slotIdx = document.getElementById('helpSlot').value;
-        if (!name || !mode || !rank || slotIdx === '') return showStatus('请填写完整', 'error');
+        if(!name||!mode||!rank||slotIdx==='') return showStatus('请填写完整','error');
+
+        const slots = generateWeekSlots();
+        const slot = slots[slotIdx];
+
+        // ==============================================
+        // 代约也禁止同一用户同一时段重复
+        // ==============================================
+        if(hasUserReservedAtSlot(name, slot.date, slot.start)){
+            return showStatus('该用户已预约过此时间段','error');
+        }
 
         const week = getWeekStart();
         const used = getWeekReserveCount(name);
         const max = getMaxLimit(name);
-        if (used >= max) return showStatus(`该用户本周已达上限(${used}/${max})`, 'error');
+        if(used >= max) return showStatus(`该用户本周已达上限(${used}/${max})`,'error');
 
-        const slots = generateWeekSlots();
-        const slot = slots[slotIdx];
-        if (!isSlotOpen(slot)) return showStatus('当前时间不开放', 'error');
-        if (getSlotUsedCount(slot) >= 2) return showStatus('已满员', 'error');
+        if(!isSlotOpen(slot)) return showStatus('当前时间不开放','error');
+        if(getSlotUsedCount(slot)>=2) return showStatus('已满员','error');
 
-        let list = JSON.parse(localStorage.getItem('reservations') || '[]');
-        list.push({ name, mode, rank, slotIdx: parseInt(slotIdx), date: slot.date, start: slot.start, week });
-        localStorage.setItem('reservations', JSON.stringify(list));
+        let list = JSON.parse(localStorage.getItem('reservations')||'[]');
+        list.push({name,mode,rank,slotIdx:parseInt(slotIdx),date:slot.date,start:slot.start,week});
+        localStorage.setItem('reservations',JSON.stringify(list));
 
-        let users = JSON.parse(localStorage.getItem('users') || '[]');
-        let user = users.find(x => x.name === name);
-        if (user) { user.total++; } 
-        else users.push({ name, level: '普通用户', total: 1 });
-        localStorage.setItem('users', JSON.stringify(users));
+        let users = JSON.parse(localStorage.getItem('users')||'[]');
+        let user = users.find(x=>x.name===name);
+        if(user){ user.total++; } 
+        else users.push({name,level:'普通用户',total:1});
+        localStorage.setItem('users',JSON.stringify(users));
 
         document.getElementById('helpNick').value = '';
         document.getElementById('helpRank').value = '';
@@ -603,13 +645,13 @@
         document.getElementById('successBox').classList.remove('hidden');
     };
 
-    document.getElementById('successClose').onclick = function () {
+    document.getElementById('successClose').onclick = function(){
         document.getElementById('successBox').classList.add('hidden');
     };
 
-    window.onload = function () {
+    window.onload = function(){
         const user = localStorage.getItem('loginUser');
-        if (user) afterLogin(user);
+        if(user) afterLogin(user);
     };
 </script>
 </body>
