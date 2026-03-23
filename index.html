@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>王者荣耀开黑预约系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#C41E3A',
+                        secondary: '#1E293B',
+                        accent: '#FBBF24',
+                    },
+                },
+            }
+        }
+    </script>
+    <style type="text/css">
+        .admin-page { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans">
+
+<header class="bg-secondary text-white sticky top-0 z-50">
+    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-2">
+            <i class="fa fa-gamepad text-accent text-2xl"></i>
+            <h1 class="text-xl font-bold">王者荣耀开黑预约系统</h1>
+        </div>
+        <div id="headerRight" class="flex flex-col items-end gap-1">
+            <div id="userInfo" class="hidden text-sm px-2 py-1 bg-white/10 rounded">
+                欢迎：<span id="showName"></span>
+                <span id="showLevel" class="ml-1 text-yellow-300"></span>
+            </div>
+            <div id="remainTip" class="hidden text-xs bg-white/10 px-2 py-0.5 rounded">
+                本周剩余：<span id="remainNum" class="text-green-300 font-bold"></span> 次
+            </div>
+            <button id="logoutBtn" class="hidden bg-red-600 hover:bg-red-700 text-xs px-2 py-1 rounded">
+                退出登录
+            </button>
+        </div>
+    </div>
+</header>
+
+<main class="container mx-auto px-4 py-6">
+    <div id="statusBar" class="mb-6 p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hidden">
+        <i class="fa fa-info-circle mr-2"></i><span id="statusText"></span>
+    </div>
+
+    <!-- 登录页面 -->
+    <div id="loginBox" class="bg-white rounded-xl p-6 card-shadow max-w-md mx-auto">
+        <h2 class="text-xl font-bold mb-4 text-center">用户登录</h2>
+        <p class="text-gray-500 text-sm text-center mb-4">使用游戏昵称登录</p>
+        <input type="text" id="loginNick" placeholder="请输入游戏昵称" 
+            class="w-full px-4 py-2 border rounded-lg mb-4">
+        <button id="loginBtn" class="w-full bg-primary text-white py-2 rounded-lg hover:bg-primary/90">
+            登录
+        </button>
+    </div>
+
+    <!-- 普通用户界面 -->
+    <div id="userMain" class="hidden">
+        <div class="bg-white rounded-xl p-5 mb-8 card-shadow">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <i class="fa fa-calendar-plus-o text-primary mr-2"></i>我要预约
+            </h2>
+            <form id="userReserveForm" class="grid md:grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">游戏昵称</label>
+                    <input type="text" id="userNick" readonly class="w-full px-4 py-2 border rounded-lg bg-gray-50">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">游戏模式</label>
+                    <select id="userMode" required class="w-full px-4 py-2 border rounded-lg">
+                        <option value="">选择模式</option>
+                        <option value="娱乐模式">娱乐模式</option>
+                        <option value="技术模式">技术模式</option>
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">当前段位</label>
+                    <input type="text" id="userRank" required placeholder="例如：王者10星"
+                        class="w-full px-4 py-2 border rounded-lg">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">预约时间段</label>
+                    <select id="userSlot" required class="w-full px-4 py-2 border rounded-lg">
+                        <option value="">加载时间段...</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <button type="submit" class="w-full bg-primary text-white py-2.5 rounded-lg">
+                        提交预约
+                    </button>
+                </div>
+            </form>
+        </div>
+        <div class="mb-8">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <i class="fa fa-calendar text-primary mr-2"></i>可预约时间段
+            </h2>
+            <div id="userSlotContainer" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
+        </div>
+    </div>
+
+    <!-- 管理员专属界面 -->
+    <div id="adminMain" class="hidden">
+        <div class="bg-white rounded-xl p-5 card-shadow mb-6">
+            <h2 class="text-xl font-bold text-red-600 mb-4">🔑 管理员控制台（楠小小风865370）</h2>
+            <div class="flex flex-wrap gap-3 mb-6">
+                <button onclick="showAdminPage('detail')" class="bg-blue-600 text-white px-4 py-2 rounded">预约详情</button>
+                <button onclick="showAdminPage('help')" class="bg-green-600 text-white px-4 py-2 rounded">帮助预约</button>
+                <button onclick="showAdminPage('edit')" class="bg-orange-600 text-white px-4 py-2 rounded">预约修改</button>
+                <button onclick="showAdminPage('user')" class="bg-purple-600 text-white px-4 py-2 rounded">用户信息修改</button>
+            </div>
+
+            <!-- 1. 预约详情 -->
+            <div id="adminDetailPage" class="admin-page">
+                <h3 class="font-bold mb-3">全部用户预约汇总</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[600px] border text-sm">
+                        <thead class="bg-gray-100"><tr>
+                            <th class="p-2 text-left">用户昵称</th><th class="p-2 text-left">等级</th>
+                            <th class="p-2 text-left">模式</th><th class="p-2 text-left">段位</th>
+                            <th class="p-2 text-left">预约时间</th>
+                        </tr></thead>
+                        <tbody id="adminDetailList"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. 帮助预约 -->
+            <div id="adminHelpPage" class="admin-page">
+                <h3 class="font-bold mb-3">帮助他人预约</h3>
+                <form id="adminHelpForm" class="grid md:grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium">用户昵称</label>
+                        <input type="text" id="helpNick" required placeholder="请输入对方游戏昵称" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium">游戏模式</label>
+                        <select id="helpMode" required class="w-full px-4 py-2 border rounded-lg">
+                            <option value="">选择模式</option><option value="娱乐模式">娱乐模式</option><option value="技术模式">技术模式</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium">段位</label>
+                        <input type="text" id="helpRank" required placeholder="例如：王者10星" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium">时间段</label>
+                        <select id="helpSlot" required class="w-full px-4 py-2 border rounded-lg"></select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg">代提交预约</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 3. 预约修改 -->
+            <div id="adminEditPage" class="admin-page">
+                <h3 class="font-bold mb-3">预约管理（修改时间段 / 删除）</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px] border text-sm">
+                        <thead class="bg-gray-100"><tr>
+                            <th class="p-2 text-left">用户</th><th class="p-2 text-left">模式</th><th class="p-2 text-left">段位</th>
+                            <th class="p-2 text-left">原时间段</th><th class="p-2 text-left">修改为</th><th class="p-2 text-left">操作</th>
+                        </tr></thead>
+                        <tbody id="adminEditList"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 4. 用户信息修改 → 新增 -->
+            <div id="adminUserPage" class="admin-page">
+                <h3 class="font-bold mb-3">用户等级管理</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[500px] border text-sm">
+                        <thead class="bg-gray-100"><tr>
+                            <th class="p-2 text-left">昵称</th>
+                            <th class="p-2 text-left">有效预约数</th>
+                            <th class="p-2 text-left">当前等级</th>
+                            <th class="p-2 text-left">修改等级</th>
+                        </tr></thead>
+                        <tbody id="adminUserList"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 成功弹窗 -->
+    <div id="successBox" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl max-w-sm w-full">
+            <h3 class="text-lg font-bold text-green-600 mb-3">✅ 操作成功</h3>
+            <p class="mb-4">已完成对应操作</p>
+            <button id="successClose" class="px-4 py-2 bg-primary text-white rounded">确定</button>
+        </div>
+    </div>
+</main>
+
+<footer class="bg-secondary text-white py-4 text-center text-sm">
+    <p>王者荣耀开黑预约系统 &copy; 2026</p>
+    <p class="text-gray-400 mt-1">时段前12小时截止 | 每周日22:00刷新 | 每时段最多2人</p>
+</footer>
+
+<script>
+    // 工具
+    function showStatus(text, type = 'info') {
+        const bar = document.getElementById('statusBar');
+        const t = document.getElementById('statusText');
+        t.textContent = text;
+        bar.className = 'mb-6 p-3 rounded-lg text-sm hidden';
+        if (type === 'success') bar.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
+        else if (type === 'error') bar.classList.add('bg-red-50', 'border-red-200', 'text-red-700');
+        else bar.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
+        bar.classList.remove('hidden');
+        setTimeout(() => bar.classList.add('hidden'), 3000);
+    }
+
+    function getWeekStart(date = new Date()) {
+        const d = new Date(date);
+        const day = d.getDay() || 7;
+        d.setDate(d.getDate() - day + 1);
+        d.setHours(0, 0, 0, 0);
+        return d.toISOString().split('T')[0];
+    }
+
+    // 时间段
+    function generateWeekSlots() {
+        const now = new Date();
+        const slots = [];
+        const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        const add = (now.getDay() === 0 && now.getHours() >= 22) ? 7 : 0;
+        for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setDate(now.getDate() - now.getDay() + i + 1 + add);
+            const date = d.toISOString().split('T')[0];
+            const day = dayNames[i];
+            const isWeekend = i >= 5;
+            if (isWeekend) {
+                slots.push({ date, day, start: '09:30', end: '12:00' });
+                slots.push({ date, day, start: '14:00', end: '16:00' });
+                slots.push({ date, day, start: '17:20', end: '21:20' });
+                slots.push({ date, day, start: '21:30', end: '23:10' });
+            } else {
+                slots.push({ date, day, start: '21:30', end: '23:00' });
+            }
+        }
+        return slots;
+    }
+
+    function getSlotTime(slot) {
+        const [h, m] = slot.start.split(':').map(Number);
+        const dt = new Date(slot.date);
+        dt.setHours(h, m, 0, 0);
+        return dt;
+    }
+
+    function isSlotOpen(slot) {
+        const now = new Date();
+        const st = getSlotTime(slot);
+        if (now >= st) return false;
+        const dead = new Date(st - 12 * 60 * 60 * 1000);
+        return now < dead;
+    }
+
+    function getSlotUsedCount(slot) {
+        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
+        return list.filter(r => r.date === slot.date && r.start === slot.start).length;
+    }
+
+    // 用户系统
+    function getUser(name) {
+        let users = JSON.parse(localStorage.getItem('users') || '[]');
+        let user = users.find(u => u.name === name);
+        if (!user) {
+            user = { name, level: '普通用户', total: 0 };
+            users.push(user);
+            localStorage.setItem('users', JSON.stringify(users));
+        }
+        return user;
+    }
+
+    function updateAutoLevel(name) {
+        let users = JSON.parse(localStorage.getItem('users') || '[]');
+        let idx = users.findIndex(u => u.name === name);
+        if (idx === -1) return;
+        let n = users[idx].total;
+        let lv = '普通用户';
+        if (n > 50) lv = 'SVIP用户';
+        else if (n > 25) lv = 'VIP用户';
+        else if (n > 5) lv = '高级用户';
+        users[idx].level = lv;
+        localStorage.setItem('users', JSON.stringify(users));
+    }
+
+    function getWeekReserveCount(name) {
+        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
+        const week = getWeekStart();
+        return list.filter(r => r.name === name && r.week === week).length;
+    }
+
+    function getMaxLimit(name) {
+        const u = getUser(name);
+        if (u.level === 'SVIP用户') return 999;
+        if (u.level === 'VIP用户') return 4;
+        if (u.level === '高级用户') return 3;
+        return 2;
+    }
+
+    function showRemainTimes(name) {
+        const used = getWeekReserveCount(name);
+        const max = getMaxLimit(name);
+        const rem = max - used;
+        document.getElementById('remainNum').textContent = rem;
+        document.getElementById('remainTip').classList.remove('hidden');
+    }
+
+    // 普通用户时间段渲染
+    function renderUserSlots() {
+        const c = document.getElementById('userSlotContainer');
+        const s = document.getElementById('userSlot');
+        const slots = generateWeekSlots();
+        c.innerHTML = '';
+        s.innerHTML = '<option value="">选择预约时间段</option>';
+        slots.forEach((slot, i) => {
+            const open = isSlotOpen(slot);
+            const cnt = getSlotUsedCount(slot);
+            const full = cnt >= 2;
+            let txt = open ? (full ? '已满员' : '可预约') : '当前时间不开放';
+            const div = document.createElement('div');
+            div.className = 'bg-white rounded-xl p-4 card-shadow';
+            div.innerHTML = `
+            <div class="flex justify-between"><b>${slot.day}</b><span class="text-sm text-gray-500">${slot.date}</span></div>
+            <div class="my-2">${slot.start} - ${slot.end}</div>
+            <div class="text-sm ${!open || full ? 'text-red-600' : 'text-green-600'}">${txt}</div>`;
+            c.appendChild(div);
+            if (open && !full) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `${slot.day} ${slot.date} ${slot.start}`;
+                s.appendChild(opt);
+            }
+        });
+    }
+
+    // 管理员时间段选择框
+    function fillAdminSlotSelect(selId) {
+        const sel = document.getElementById(selId);
+        const slots = generateWeekSlots();
+        sel.innerHTML = '';
+        slots.forEach((slot, i) => {
+            if (isSlotOpen(slot) && getSlotUsedCount(slot) < 2) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `${slot.day} ${slot.date} ${slot.start}`;
+                sel.appendChild(opt);
+            }
+        });
+    }
+
+    // 页面切换
+    function showAdminPage(key) {
+        document.querySelectorAll('.admin-page').forEach(el => el.style.display = 'none');
+        if (key === 'detail') {
+            document.getElementById('adminDetailPage').style.display = 'block';
+            renderAdminDetail();
+        } else if (key === 'help') {
+            document.getElementById('adminHelpPage').style.display = 'block';
+            fillAdminSlotSelect('helpSlot');
+        } else if (key === 'edit') {
+            document.getElementById('adminEditPage').style.display = 'block';
+            renderAdminEdit();
+        } else if (key === 'user') {
+            document.getElementById('adminUserPage').style.display = 'block';
+            renderAdminUser();
+        }
+    }
+
+    // 1. 预约详情
+    function renderAdminDetail() {
+        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
+        const slots = generateWeekSlots();
+        const html = list.map((r, i) => {
+            const slot = slots[r.slotIdx] || {};
+            const u = getUser(r.name);
+            const time = slot.day ? `${slot.day} ${slot.date} ${slot.start}` : '已过期';
+            return `<tr>
+                <td class="p-2">${r.name}</td><td class="p-2">${u.level}</td>
+                <td class="p-2">${r.mode}</td><td class="p-2">${r.rank}</td><td class="p-2">${time}</td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="5" class="p-2 text-center">暂无预约</td></tr>';
+        document.getElementById('adminDetailList').innerHTML = html;
+    }
+
+    // 2. 预约修改
+    function renderAdminEdit() {
+        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
+        const slots = generateWeekSlots();
+        const html = list.map((r, idx) => {
+            const slot = slots[r.slotIdx] || {};
+            const oldTime = slot.day ? `${slot.day} ${slot.start}` : '已过期';
+            let options = '';
+            slots.forEach((s, i) => {
+                if (isSlotOpen(s) && getSlotUsedCount(s) < 2) {
+                    options += `<option value="${i}" ${r.slotIdx == i ? 'selected' : ''}>${s.day} ${s.start}</option>`;
+                }
+            });
+            return `<tr>
+                <td class="p-2">${r.name}</td><td class="p-2">${r.mode}</td><td class="p-2">${r.rank}</td>
+                <td class="p-2">${oldTime}</td>
+                <td class="p-2"><select class="border p-1 text-sm edit-slot-${idx}">${options}</select></td>
+                <td class="p-2">
+                    <button onclick="adminUpdateSlot(${idx})" class="text-blue-600 mr-2">保存</button>
+                    <button onclick="adminDeleteReserve(${idx})" class="text-red-600">删除</button>
+                </td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="6" class="p-2 text-center">暂无预约</td></tr>';
+        document.getElementById('adminEditList').innerHTML = html;
+    }
+
+    window.adminUpdateSlot = function (idx) {
+        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
+        const slots = generateWeekSlots();
+        const newSlotIdx = document.querySelector(`.edit-slot-${idx}`).value;
+        if (newSlotIdx == null) return showStatus('请选择时间段', 'error');
+        list[idx].slotIdx = parseInt(newSlotIdx);
+        list[idx].date = slots[newSlotIdx].date;
+        list[idx].start = slots[newSlotIdx].start;
+        localStorage.setItem('reservations', JSON.stringify(list));
+        renderAdminEdit();
+        showStatus('时间段已修改', 'success');
+    }
+
+    window.adminDeleteReserve = function (idx) {
+        if (!confirm('确定删除？')) return;
+        const list = JSON.parse(localStorage.getItem('reservations') || '[]');
+        list.splice(idx, 1);
+        localStorage.setItem('reservations', JSON.stringify(list));
+        renderAdminEdit();
+        renderAdminDetail();
+        showStatus('已删除', 'success');
+    }
+
+    // 3. 用户信息修改 → 核心新增
+    function renderAdminUser() {
+        let users = JSON.parse(localStorage.getItem('users') || '[]');
+        users = users.filter(u => u.name !== '楠小小风865370');
+        const html = users.map((u, idx) => `
+        <tr>
+            <td class="p-2">${u.name}</td>
+            <td class="p-2">${u.total}</td>
+            <td class="p-2">${u.level}</td>
+            <td class="p-2">
+                <select class="border p-1 user-level-${idx}" onchange="adminSetUserLevel(${idx}, this.value)">
+                    <option value="普通用户" ${u.level === '普通用户' ? 'selected' : ''}>普通用户</option>
+                    <option value="高级用户" ${u.level === '高级用户' ? 'selected' : ''}>高级用户</option>
+                    <option value="VIP用户" ${u.level === 'VIP用户' ? 'selected' : ''}>VIP用户</option>
+                    <option value="SVIP用户" ${u.level === 'SVIP用户' ? 'selected' : ''}>SVIP用户</option>
+                </select>
+            </td>
+        </tr>`).join('') || '<tr><td colspan="4" class="p-2 text-center">暂无用户</td></tr>';
+        document.getElementById('adminUserList').innerHTML = html;
+    }
+
+    window.adminSetUserLevel = function (idx, newLevel) {
+        let users = JSON.parse(localStorage.getItem('users') || '[]');
+        const filtered = users.filter(u => u.name !== '楠小小风865370');
+        const targetName = filtered[idx].name;
+        users = users.map(u => {
+            if (u.name === targetName) u.level = newLevel;
+            return u;
+        });
+        localStorage.setItem('users', JSON.stringify(users));
+        renderAdminUser();
+        renderAdminDetail();
+        showStatus('用户等级已修改', 'success');
+
+        // 如果该用户在线，同步刷新显示
+        const loginUser = localStorage.getItem('loginUser');
+        if (loginUser === targetName) {
+            document.getElementById('showLevel').textContent = newLevel;
+            showRemainTimes(targetName);
+        }
+    }
+
+    // 登录 & 退出
+    function logout() {
+        localStorage.removeItem('loginUser');
+        document.getElementById('loginBox').classList.remove('hidden');
+        document.getElementById('userMain').classList.add('hidden');
+        document.getElementById('adminMain').classList.add('hidden');
+        document.getElementById('userInfo').classList.add('hidden');
+        document.getElementById('remainTip').classList.add('hidden');
+        document.getElementById('logoutBtn').classList.add('hidden');
+        showStatus('已退出登录', 'success');
+    }
+
+    document.getElementById('logoutBtn').onclick = logout;
+
+    function afterLogin(name) {
+        document.getElementById('loginBox').classList.add('hidden');
+        document.getElementById('userInfo').classList.remove('hidden');
+        document.getElementById('logoutBtn').classList.remove('hidden');
+        document.getElementById('showName').textContent = name;
+
+        if (name === '楠小小风865370') {
+            document.getElementById('adminMain').classList.remove('hidden');
+            document.getElementById('userMain').classList.add('hidden');
+            document.getElementById('showLevel').textContent = '【管理员】';
+            showAdminPage('detail');
+            showStatus('欢迎管理员', 'success');
+            return;
+        }
+
+        document.getElementById('userMain').classList.remove('hidden');
+        document.getElementById('adminMain').classList.add('hidden');
+        const u = getUser(name);
+        document.getElementById('showLevel').textContent = u.level;
+        document.getElementById('userNick').value = name;
+        showRemainTimes(name);
+        renderUserSlots();
+    }
+
+    document.getElementById('loginBtn').onclick = function () {
+        const name = document.getElementById('loginNick').value.trim();
+        if (!name) return showStatus('请输入昵称', 'error');
+        localStorage.setItem('loginUser', name);
+        afterLogin(name);
+    };
+
+    // 普通用户预约
+    document.getElementById('userReserveForm').onsubmit = function (e) {
+        e.preventDefault();
+        const name = document.getElementById('userNick').value.trim();
+        const mode = document.getElementById('userMode').value;
+        const rank = document.getElementById('userRank').value.trim();
+        const slotIdx = document.getElementById('userSlot').value;
+        if (!mode || !rank || slotIdx === '') return showStatus('信息不全', 'error');
+
+        const week = getWeekStart();
+        const used = getWeekReserveCount(name);
+        const max = getMaxLimit(name);
+        if (used >= max) return showStatus(`本周上限(${used}/${max})`, 'error');
+
+        const slots = generateWeekSlots();
+        const slot = slots[slotIdx];
+        if (!isSlotOpen(slot)) return showStatus('当前时间不开放', 'error');
+        if (getSlotUsedCount(slot) >= 2) return showStatus('已满员', 'error');
+
+        let list = JSON.parse(localStorage.getItem('reservations') || '[]');
+        list.push({ name, mode, rank, slotIdx: parseInt(slotIdx), date: slot.date, start: slot.start, week });
+        localStorage.setItem('reservations', JSON.stringify(list));
+
+        let users = JSON.parse(localStorage.getItem('users') || '[]');
+        let user = users.find(x => x.name === name);
+        if (user) { user.total++; updateAutoLevel(name); }
+        localStorage.setItem('users', JSON.stringify(users));
+
+        showRemainTimes(name);
+        renderUserSlots();
+        document.getElementById('successBox').classList.remove('hidden');
+    };
+
+    // 管理员代约
+    document.getElementById('adminHelpForm').onsubmit = function (e) {
+        e.preventDefault();
+        const name = document.getElementById('helpNick').value.trim();
+        const mode = document.getElementById('helpMode').value;
+        const rank = document.getElementById('helpRank').value.trim();
+        const slotIdx = document.getElementById('helpSlot').value;
+        if (!name || !mode || !rank || slotIdx === '') return showStatus('请填写完整', 'error');
+
+        const week = getWeekStart();
+        const used = getWeekReserveCount(name);
+        const max = getMaxLimit(name);
+        if (used >= max) return showStatus(`该用户本周已达上限(${used}/${max})`, 'error');
+
+        const slots = generateWeekSlots();
+        const slot = slots[slotIdx];
+        if (!isSlotOpen(slot)) return showStatus('当前时间不开放', 'error');
+        if (getSlotUsedCount(slot) >= 2) return showStatus('已满员', 'error');
+
+        let list = JSON.parse(localStorage.getItem('reservations') || '[]');
+        list.push({ name, mode, rank, slotIdx: parseInt(slotIdx), date: slot.date, start: slot.start, week });
+        localStorage.setItem('reservations', JSON.stringify(list));
+
+        let users = JSON.parse(localStorage.getItem('users') || '[]');
+        let user = users.find(x => x.name === name);
+        if (user) { user.total++; } 
+        else users.push({ name, level: '普通用户', total: 1 });
+        localStorage.setItem('users', JSON.stringify(users));
+
+        document.getElementById('helpNick').value = '';
+        document.getElementById('helpRank').value = '';
+        fillAdminSlotSelect('helpSlot');
+        showAdminPage('detail');
+        document.getElementById('successBox').classList.remove('hidden');
+    };
+
+    document.getElementById('successClose').onclick = function () {
+        document.getElementById('successBox').classList.add('hidden');
+    };
+
+    window.onload = function () {
+        const user = localStorage.getItem('loginUser');
+        if (user) afterLogin(user);
+    };
+</script>
+</body>
+</html>
