@@ -129,7 +129,7 @@
 
     <div id="adminMain" class="hidden">
         <div class="bg-white rounded-xl p-5 card-shadow mb-6">
-            <h2 class="text-xl font-bold text-red-600 mb-4">🔑 管理员控制台（楠小小风865370）</h2>
+            <h2 class="text-xl font-bold text-red-600 mb-4">🔑 管理员控制台</h2>
             <div class="flex flex-wrap gap-3 mb-6">
                 <button onclick="showAdminPage('detail')" class="bg-blue-600 text-white px-4 py-2 rounded">预约详情</button>
                 <button onclick="showAdminPage('help')" class="bg-green-600 text-white px-4 py-2 rounded">帮助预约</button>
@@ -223,6 +223,7 @@
 </footer>
 
 <script>
+// ====================== 后端接口完整保留 ======================
 const API_BASE = 'http://localhost:8080/api';
 axios.defaults.baseURL = API_BASE;
 axios.defaults.headers.post['Content-Type'] = 'application/json';
@@ -230,10 +231,11 @@ axios.defaults.headers.post['Content-Type'] = 'application/json';
 const LOGIN_KEY = 'loginUser';
 const ALL_SLOTS = generateWeekSlots();
 
-// 获取全量预约列表（用于统计人数、我的预约、管理员列表）
-async function getReserveList() {
+// 获取完整预约列表（真实后端）
+async function getReserves() {
     try {
-        return (await axios.get('/reserve/list')).data || [];
+        const res = await axios.get('/reserve/list');
+        return res.data || [];
     } catch (e) {
         console.error(e);
         return [];
@@ -241,15 +243,16 @@ async function getReserveList() {
 }
 
 // 获取用户列表
-async function getUserList() {
+async function getUsers() {
     try {
-        return (await axios.get('/user/list')).data || [];
+        const res = await axios.get('/user/list');
+        return res.data || [];
     } catch (e) {
         return [];
     }
 }
 
-// 时间段是否开放：本地时间判断，不联网
+// 本地判断时间段是否开放，不联网
 function getSlotTime(slot) {
     const [h, m] = slot.start.split(':').map(Number);
     const dt = new Date(slot.date);
@@ -265,7 +268,7 @@ function isSlotOpen(slot) {
     return now < dead;
 }
 
-// 初始化时间段视图：只执行一次
+// 时间段结构只渲染一次
 function initSlotView() {
     const c = document.getElementById('userSlotContainer');
     const s = document.getElementById('userSlot');
@@ -280,7 +283,7 @@ function initSlotView() {
         <div class="flex justify-between"><b>${slot.day}</b><span class="text-sm text-gray-500">${slot.date}</span></div>
         <div class="my-2">${slot.start} - ${slot.end}</div>
         <div class="text-sm slot-status"></div>
-        <div class="text-xs mt-1 text-gray-500 slot-count"></div>`;
+        <div class="text-xs mt-1 text-gray-400 slot-count"></div>`;
         c.appendChild(div);
 
         const opt = document.createElement('option');
@@ -290,21 +293,22 @@ function initSlotView() {
     });
 }
 
-// 只联网刷新：人数、状态、我的预约、用户等级
+// 只联网刷新：人数、等级、预约记录（不刷新时间段结构）
 async function refreshDynamicData() {
     const loginUser = localStorage.getItem(LOGIN_KEY);
     if (!loginUser) return;
 
-    const reserves = await getReserveList();
-    const users = await getUserList();
+    const reserves = await getReserves();
+    const users = await getUsers();
 
-    // 1. 更新各时间段人数
+    // 统计人数
     const countMap = {};
     reserves.forEach(r => {
-        const k = r.date + '|' + r.startTime;
-        countMap[k] = (countMap[k] || 0) + 1;
+        const key = r.date + '|' + r.startTime;
+        countMap[key] = (countMap[key] || 0) + 1;
     });
 
+    // 更新时间段人数
     document.querySelectorAll('.slot-card').forEach(card => {
         const i = card.dataset.index;
         const slot = ALL_SLOTS[i];
@@ -321,16 +325,16 @@ async function refreshDynamicData() {
         countEl.textContent = `已预约：${cnt}/2`;
     });
 
-    // 2. 更新我的预约
+    // 我的预约
     const myList = reserves.filter(r => r.name === loginUser);
-    renderMyReserveList(myList);
+    renderMyReserves(myList);
 
-    // 3. 更新用户等级与剩余次数
+    // 等级与次数
     updateUserInfo(loginUser, users, myList);
 }
 
-// 渲染我的预约列表
-function renderMyReserveList(myList) {
+// 渲染我的预约
+function renderMyReserves(myList) {
     const html = myList.map((r, idx) => {
         const slot = ALL_SLOTS[r.slotIdx] || {};
         const time = slot.day ? `${slot.day} ${slot.date} ${slot.start}` : '已过期';
@@ -340,14 +344,14 @@ function renderMyReserveList(myList) {
             <td class="p-2">${r.rank}</td>
             <td class="p-2">${time}</td>
             <td class="p-2">
-                <button onclick="cancelReserve(${idx})" class="text-red-600">取消预约</button>
+                <button onclick="cancelMyReserve(${idx})" class="text-red-600">取消预约</button>
             </td>
         </tr>`;
     }).join('') || '<tr><td colspan="4" class="p-2 text-center">暂无预约记录</td></tr>';
     document.getElementById('myReserveList').innerHTML = html;
 }
 
-// 更新用户等级、本周剩余次数
+// 更新用户信息
 function updateUserInfo(name, users, myList) {
     const user = users.find(u => u.name === name) || { name, level: '普通用户' };
     document.getElementById('showLevel').textContent = user.level;
@@ -362,28 +366,7 @@ function updateUserInfo(name, users, myList) {
     document.getElementById('remainTip').classList.remove('hidden');
 }
 
-// 取消预约
-window.cancelReserve = async function (idx) {
-    const name = localStorage.getItem(LOGIN_KEY);
-    const list = await getReserveList();
-    const myList = list.filter(r => r.name === name);
-    const tar = myList[idx];
-    if (!confirm('确定取消预约？')) return;
-
-    try {
-        await axios.post('/reserve/delete', {
-            nickName: tar.name,
-            date: tar.date,
-            startTime: tar.startTime
-        });
-        refreshDynamicData();
-        showStatus('取消成功', 'success');
-    } catch (e) {
-        showStatus('操作失败', 'error');
-    }
-};
-
-// 提交预约（用户端）
+// ====================== 用户提交预约（真实后端上传） ======================
 document.getElementById('userReserveForm').onsubmit = async function (e) {
     e.preventDefault();
     const name = document.getElementById('userNick').value.trim();
@@ -392,54 +375,73 @@ document.getElementById('userReserveForm').onsubmit = async function (e) {
     const slotIdx = document.getElementById('userSlot').value;
     const slot = ALL_SLOTS[slotIdx];
 
-    if (!name || !mode || !rank || slotIdx === undefined) return showStatus('请完善信息');
+    const reserves = await getReserves();
+    const cnt = reserves.filter(r => r.date === slot.date && r.startTime === slot.start).length;
 
-    const list = await getReserveList();
-    const cnt = list.filter(r => r.date === slot.date && r.startTime === slot.start).length;
-
-    if (!isSlotOpen(slot)) return showStatus('该时间段已截止');
-    if (cnt >= 2) return showStatus('该时间段已满员');
-    if (list.some(r => r.name === name && r.date === slot.date && r.startTime === slot.start)) {
-        return showStatus('你已预约过该时间段');
+    if (!isSlotOpen(slot)) return showStatus('时间段已截止', 'error');
+    if (cnt >= 2) return showStatus('已满员', 'error');
+    if (reserves.some(r => r.name === name && r.date === slot.date && r.startTime === slot.start)) {
+        return showStatus('已预约过此时段', 'error');
     }
 
     try {
+        // 真实提交后端
         await axios.post('/reserve/add', {
-            name: name,
-            mode: mode,
-            rank: rank,
-            slotIdx: parseInt(slotIdx),
+            name, mode, rank,
+            slotIdx: +slotIdx,
             date: slot.date,
             startTime: slot.start,
             week: getWeekStart()
         });
-        refreshDynamicData();
+
+        await refreshDynamicData();
         document.getElementById('successBox').classList.remove('hidden');
-    } catch (err) {
-        showStatus('预约提交失败', 'error');
+    } catch (e) {
+        showStatus('提交失败', 'error');
     }
 };
 
-// ===================== 管理员 =====================
+// 取消预约（真实后端）
+window.cancelMyReserve = async function (idx) {
+    const name = localStorage.getItem(LOGIN_KEY);
+    const list = await getReserves();
+    const myList = list.filter(r => r.name === name);
+    const tar = myList[idx];
+    if (!confirm('确定取消？')) return;
+
+    try {
+        await axios.post('/reserve/delete', {
+            nickName: tar.name,
+            date: tar.date,
+            startTime: tar.startTime
+        });
+        await refreshDynamicData();
+        showStatus('取消成功', 'success');
+    } catch (e) {
+        showStatus('失败', 'error');
+    }
+};
+
+// ====================== 管理员完整后端接口 ======================
 function showAdminPage(key) {
     document.querySelectorAll('.admin-page').forEach(el => el.style.display = 'none');
     if (key === 'detail') {
         document.getElementById('adminDetailPage').style.display = 'block';
-        renderAdminReserveList();
+        renderAdminDetail();
     } else if (key === 'help') {
         document.getElementById('adminHelpPage').style.display = 'block';
-        fillAdminSlotSelect();
+        fillAdminHelpSlot();
     } else if (key === 'edit') {
         document.getElementById('adminEditPage').style.display = 'block';
-        renderAdminEditList();
+        renderAdminEdit();
     } else if (key === 'user') {
         document.getElementById('adminUserPage').style.display = 'block';
-        renderAdminUserList();
+        renderAdminUser();
     }
 }
 
-async function renderAdminReserveList() {
-    const list = await getReserveList();
+async function renderAdminDetail() {
+    const list = await getReserves();
     const html = list.map(r => {
         const slot = ALL_SLOTS[r.slotIdx] || {};
         return `<tr>
@@ -447,24 +449,29 @@ async function renderAdminReserveList() {
             <td class="p-2">${r.level || '普通用户'}</td>
             <td class="p-2">${r.mode}</td>
             <td class="p-2">${r.rank}</td>
-            <td class="p-2">${slot.day || ''} ${slot.date} ${slot.start}</td>
+            <td class="p-2">${slot.day} ${slot.date} ${slot.start}</td>
         </tr>`;
     }).join('') || '<tr><td colspan="5" class="p-2 text-center">暂无预约</td></tr>';
     document.getElementById('adminDetailList').innerHTML = html;
 }
 
-async function renderAdminEditList() {
-    const list = await getReserveList();
+async function renderAdminEdit() {
+    const list = await getReserves();
     let html = '';
     list.forEach((r, idx) => {
         const slot = ALL_SLOTS[r.slotIdx] || {};
+        let opts = '';
+        ALL_SLOTS.forEach((s, i) => {
+            opts += `<option value="${i}" ${r.slotIdx == i ? 'selected' : ''}>${s.day} ${s.start}</option>`;
+        });
         html += `<tr>
             <td class="p-2">${r.name}</td>
             <td class="p-2">${r.mode}</td>
             <td class="p-2">${r.rank}</td>
             <td class="p-2">${slot.day} ${slot.start}</td>
-            <td class="p-2">—</td>
+            <td class="p-2"><select class="edit-slot-${idx} border p-1">${opts}</select></td>
             <td class="p-2">
+                <button onclick="adminUpdate(${idx})" class="text-blue-600 mr-2">保存</button>
                 <button onclick="adminDel(${idx})" class="text-red-600">删除</button>
             </td>
         </tr>`;
@@ -472,8 +479,22 @@ async function renderAdminEditList() {
     document.getElementById('adminEditList').innerHTML = html || '<tr><td colspan="6" class="p-2 text-center">暂无预约</td></tr>';
 }
 
+window.adminUpdate = async function (idx) {
+    const list = await getReserves();
+    const r = list[idx];
+    const slotIdx = document.querySelector(`.edit-slot-${idx}`).value;
+    const slot = ALL_SLOTS[slotIdx];
+    await axios.post('/reserve/update', {
+        id: r.id,
+        slotIdx: +slotIdx,
+        date: slot.date,
+        startTime: slot.start
+    });
+    showAdminPage('detail');
+};
+
 window.adminDel = async function (idx) {
-    const list = await getReserveList();
+    const list = await getReserves();
     const r = list[idx];
     if (!confirm('确定删除？')) return;
     await axios.post('/reserve/delete', {
@@ -482,33 +503,34 @@ window.adminDel = async function (idx) {
     showAdminPage('detail');
 };
 
-async function renderAdminUserList() {
-    const users = (await getUserList()).filter(u => u.name !== '楠小小风865370');
+async function renderAdminUser() {
+    const users = (await getUsers()).filter(u => u.name !== '楠小小风865370');
     const html = users.map((u, i) => `
     <tr>
         <td class="p-2">${u.name}</td>
         <td class="p-2">${u.total || 0}</td>
         <td class="p-2">${u.level}</td>
         <td class="p-2">
-            <select class="border p-1" onchange="changeLevel(${i}, this.value)">
-                <option value="普通用户" ${u.level === '普通用户' ? 'selected' : ''}>普通用户</option>
-                <option value="高级用户" ${u.level === '高级用户' ? 'selected' : ''}>高级用户</option>
-                <option value="VIP用户" ${u.level === 'VIP用户' ? 'selected' : ''}>VIP用户</option>
-                <option value="SVIP用户" ${u.level === 'SVIP用户' ? 'selected' : ''}>SVIP用户</option>
+            <select onchange="setUserLevel(${i},this.value)">
+                <option value="普通用户" ${u.level=='普通用户'?'selected':''}>普通用户</option>
+                <option value="高级用户" ${u.level=='高级用户'?'selected':''}>高级用户</option>
+                <option value="VIP用户" ${u.level=='VIP用户'?'selected':''}>VIP用户</option>
+                <option value="SVIP用户" ${u.level=='SVIP用户'?'selected':''}>SVIP用户</option>
             </select>
         </td>
     </tr>`).join('') || '<tr><td colspan="4" class="p-2 text-center">暂无用户</td></tr>';
     document.getElementById('adminUserList').innerHTML = html;
 }
 
-window.changeLevel = async function (idx, lv) {
-    const users = (await getUserList()).filter(u => u.name !== '楠小小风865370');
+window.setUserLevel = async function (idx, lv) {
+    const users = (await getUsers()).filter(u => u.name !== '楠小小风865370');
     const tar = users[idx];
     await axios.post('/user/updateLevel', { id: tar.id, level: lv });
-    showStatus('修改成功', 'success');
+    renderAdminUser();
+    showStatus('等级修改成功', 'success');
 };
 
-function fillAdminSlotSelect() {
+function fillAdminHelpSlot() {
     const sel = document.getElementById('helpSlot');
     sel.innerHTML = '';
     ALL_SLOTS.forEach((slot, i) => {
@@ -529,10 +551,6 @@ document.getElementById('adminHelpForm').onsubmit = async e => {
     const slotIdx = document.getElementById('helpSlot').value;
     const slot = ALL_SLOTS[slotIdx];
 
-    const list = await getReserveList();
-    const cnt = list.filter(r => r.date === slot.date && r.startTime === slot.start).length;
-    if (cnt >= 2) return showStatus('已满员');
-
     await axios.post('/reserve/add', {
         name, mode, rank,
         slotIdx: +slotIdx,
@@ -545,93 +563,93 @@ document.getElementById('adminHelpForm').onsubmit = async e => {
     document.getElementById('successBox').classList.remove('hidden');
 };
 
-// ===================== 工具 =====================
+// ====================== 工具 ======================
 function showStatus(text, type = 'info') {
     const bar = document.getElementById('statusBar');
     const t = document.getElementById('statusText');
     t.textContent = text;
     bar.className = 'mb-6 p-3 rounded-lg text-sm hidden';
-    if (type === 'success') bar.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
-    else if (type === 'error') bar.classList.add('bg-red-50', 'border-red-200', 'text-red-700');
-    else bar.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
+    if (type === 'success') bar.classList.add('bg-green-50','border-green-200','text-green-700');
+    else if (type === 'error') bar.classList.add('bg-red-50','border-red-200','text-red-700');
+    else bar.classList.add('bg-blue-50','border-blue-200','text-blue-700');
     bar.classList.remove('hidden');
-    setTimeout(() => bar.classList.add('hidden'), 2500);
+    setTimeout(()=>bar.classList.add('hidden'),2500);
 }
 
 function getWeekStart(date = new Date()) {
     const d = new Date(date);
     const day = d.getDay() || 7;
     d.setDate(d.getDate() - day + 1);
-    d.setHours(0, 0, 0, 0);
+    d.setHours(0,0,0,0);
     return d.toISOString().split('T')[0];
 }
 
 function generateWeekSlots() {
     const now = new Date();
     const slots = [];
-    const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    const addWeek = (now.getDay() === 0 && now.getHours() >= 22) ? 7 : 0;
-    for (let i = 0; i < 7; i++) {
+    const dayNames = ['周一','周二','周三','周四','周五','周六','周日'];
+    const add = (now.getDay()===0 && now.getHours()>=22) ? 7 : 0;
+    for(let i=0;i<7;i++){
         const d = new Date();
-        d.setDate(now.getDate() - now.getDay() + i + 1 + addWeek);
+        d.setDate(now.getDate() - now.getDay() + i + 1 + add);
         const date = d.toISOString().split('T')[0];
         const day = dayNames[i];
-        const isWeekend = i >= 5;
-        if (isWeekend) {
-            slots.push({ date, day, start: '09:30', end: '12:00' });
-            slots.push({ date, day, start: '14:00', end: '16:00' });
-            slots.push({ date, day, start: '17:20', end: '21:20' });
-            slots.push({ date, day, start: '21:30', end: '23:10' });
-        } else {
-            slots.push({ date, day, start: '21:30', end: '23:00' });
+        const isWeekend = i>=5;
+        if(isWeekend){
+            slots.push({date,day,start:'09:30',end:'12:00'});
+            slots.push({date,day,start:'14:00',end:'16:00'});
+            slots.push({date,day,start:'17:20',end:'21:20'});
+            slots.push({date,day,start:'21:30',end:'23:10'});
+        }else{
+            slots.push({date,day,start:'21:30',end:'23:00'});
         }
     }
     return slots;
 }
 
-// ===================== 登录 =====================
-function logout() {
+// ====================== 登录 ======================
+function logout(){
     localStorage.removeItem(LOGIN_KEY);
     location.reload();
 }
 document.getElementById('logoutBtn').onclick = logout;
 
-async function afterLogin(name) {
+async function afterLogin(name){
     document.getElementById('loginBox').classList.add('hidden');
     document.getElementById('userInfo').classList.remove('hidden');
     document.getElementById('logoutBtn').classList.remove('hidden');
     document.getElementById('showName').textContent = name;
 
-    if (name === '楠小小风865370') {
+    if(name==='楠小小风865370'){
         document.getElementById('adminMain').classList.remove('hidden');
         document.getElementById('userMain').classList.add('hidden');
-        document.getElementById('showLevel').textContent = '【管理员】';
+        document.getElementById('showLevel').textContent='【管理员】';
         showAdminPage('detail');
         return;
     }
 
     document.getElementById('userMain').classList.remove('hidden');
     document.getElementById('adminMain').classList.add('hidden');
-    document.getElementById('userNick').value = name;
+    document.getElementById('userNick').value=name;
     initSlotView();
     refreshDynamicData();
 }
 
-document.getElementById('loginBtn').onclick = function () {
+document.getElementById('loginBtn').onclick = function(){
     const name = document.getElementById('loginNick').value.trim();
-    if (!name) return showStatus('请输入昵称');
-    localStorage.setItem(LOGIN_KEY, name);
+    if(!name) return showStatus('请输入昵称');
+    localStorage.setItem(LOGIN_KEY,name);
     afterLogin(name);
 };
 
-document.getElementById('successClose').onclick = () => {
+document.getElementById('successClose').onclick = ()=>{
     document.getElementById('successBox').classList.add('hidden');
 };
 
 // 启动
-window.onload = function () {
+window.onload = function(){
     const user = localStorage.getItem(LOGIN_KEY);
-    if (user) afterLogin(user);
+    if(user) afterLogin(user);
     setInterval(refreshDynamicData, 2000);
 };
 </script>
