@@ -14,9 +14,9 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#C41E30',
+                        primary: '#C41E3A',
                         secondary: '#1E293B',
-                        accent: '#FBBF29',
+                        accent: '#FBBF24',
                     },
                 },
             }
@@ -28,10 +28,10 @@
 </head>
 <body class="bg-gray-100 min-h-screen font-sans">
 
-<header class="bg-indigo-900 text-white sticky top-0 z-50">
+<header class="bg-secondary text-white sticky top-0 z-50">
     <div class="container mx-auto px-4 py-4 flex justify-between items-center">
         <div class="flex items-center gap-2">
-            <i class="fa fa-gamepad text-yellow-400 text-2xl"></i>
+            <i class="fa fa-gamepad text-accent text-2xl"></i>
             <h1 class="text-xl font-bold">王者荣耀开黑预约系统</h1>
         </div>
         <div id="headerRight" class="flex flex-col items-end gap-1">
@@ -40,9 +40,9 @@
                 <span id="showLevel" class="ml-1 text-yellow-300"></span>
             </div>
             <div id="remainTip" class="hidden text-xs bg-white/10 px-2 py-0.5 rounded">
-                本周剩余：<span id="remainNum" class="text-green-400 font-bold"></span> 次
+                本周剩余：<span id="remainNum" class="text-green-300 font-bold"></span> 次
             </div>
-            <button id="logoutBtn" class="hidden bg-red-600 hover:bg-red-700 text-xs px-3 py-1 rounded">
+            <button id="logoutBtn" class="hidden bg-red-600 hover:bg-red-700 text-xs px-2 py-1 rounded">
                 退出登录
             </button>
         </div>
@@ -54,20 +54,20 @@
         <i class="fa fa-info-circle mr-2"></i><span id="statusText"></span>
     </div>
 
-    <div id="loginBox" class="bg-white rounded-xl p-6 shadow max-w-md mx-auto">
+    <div id="loginBox" class="bg-white rounded-xl p-6 card-shadow max-w-md mx-auto">
         <h2 class="text-xl font-bold mb-4 text-center">用户登录</h2>
         <p class="text-gray-500 text-sm text-center mb-4">使用游戏昵称登录</p>
         <input type="text" id="loginNick" placeholder="请输入游戏昵称" 
             class="w-full px-4 py-2 border rounded-lg mb-4">
-        <button id="loginBtn" class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">
+        <button id="loginBtn" class="w-full bg-primary text-white py-2 rounded-lg hover:bg-primary/90">
             登录
         </button>
     </div>
 
     <div id="userMain" class="hidden">
-        <div class="bg-white rounded-xl p-5 mb-8 shadow">
+        <div class="bg-white rounded-xl p-5 mb-8 card-shadow">
             <h2 class="text-xl font-bold mb-4 flex items-center">
-                <i class="fa fa-calendar-plus text-indigo-500 mr-2"></i>我要预约
+                <i class="fa fa-calendar-plus-o text-primary mr-2"></i>我要预约
             </h2>
             <form id="userReserveForm" class="grid md:grid-cols-2 gap-4">
                 <div class="space-y-2">
@@ -77,7 +77,7 @@
                 <div class="space-y-2">
                     <label class="text-sm font-medium">游戏模式</label>
                     <select id="userMode" required class="w-full px-4 py-2 border rounded-lg">
-                        <option value="">请选择模式</option>
+                        <option value="">选择模式</option>
                         <option value="娱乐模式">娱乐模式</option>
                         <option value="技术模式">技术模式</option>
                     </select>
@@ -90,20 +90,19 @@
                 <div class="space-y-2">
                     <label class="text-sm font-medium">预约时间段</label>
                     <select id="userSlot" required class="w-full px-4 py-2 border rounded-lg">
-                        <option value="">请选择时间段</option>
                     </select>
                 </div>
                 <div class="md:col-span-2">
-                    <button type="submit" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg hover:bg-indigo-700">
+                    <button type="submit" class="w-full bg-primary text-white py-2.5 rounded-lg">
                         提交预约
                     </button>
                 </div>
             </form>
         </div>
 
-        <div class="bg-white rounded-xl p-5 mb-8 shadow">
+        <div class="bg-white rounded-xl p-5 mb-8 card-shadow">
             <h2 class="text-xl font-bold mb-4 flex items-center">
-                <i class="fa fa-list text-indigo-500 mr-2"></i>我的预约记录
+                <i class="fa fa-list-alt text-primary mr-2"></i>我的预约记录
             </h2>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[500px] border text-sm">
@@ -122,14 +121,14 @@
 
         <div class="mb-8">
             <h2 class="text-xl font-bold mb-4 flex items-center">
-                <i class="fa fa-calendar text-indigo-500 mr-2"></i>可预约时间段
+                <i class="fa fa-calendar text-primary mr-2"></i>可预约时间段
             </h2>
             <div id="userSlotContainer" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
         </div>
     </div>
 
     <div id="adminMain" class="hidden">
-        <div class="bg-white rounded-xl p-5 shadow mb-6">
+        <div class="bg-white rounded-xl p-5 card-shadow mb-6">
             <h2 class="text-xl font-bold text-red-600 mb-4">🔑 管理员控制台（楠小小风865370）</h2>
             <div class="flex flex-wrap gap-3 mb-6">
                 <button onclick="showAdminPage('detail')" class="bg-blue-600 text-white px-4 py-2 rounded">预约详情</button>
@@ -162,7 +161,7 @@
                     <div class="space-y-2">
                         <label class="text-sm font-medium">游戏模式</label>
                         <select id="helpMode" required class="w-full px-4 py-2 border rounded-lg">
-                            <option value="">请选择模式</option><option value="娱乐模式">娱乐模式</option><option value="技术模式">技术模式</option>
+                            <option value="">选择模式</option><option value="娱乐模式">娱乐模式</option><option value="技术模式">技术模式</option>
                         </select>
                     </div>
                     <div class="space-y-2">
@@ -174,7 +173,7 @@
                         <select id="helpSlot" required class="w-full px-4 py-2 border rounded-lg"></select>
                     </div>
                     <div class="md:col-span-2">
-                        <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">代提交预约</button>
+                        <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg">代提交预约</button>
                     </div>
                 </form>
             </div>
@@ -185,7 +184,7 @@
                     <table class="w-full min-w-[700px] border text-sm">
                         <thead class="bg-gray-100"><tr>
                             <th class="p-2 text-left">用户</th><th class="p-2 text-left">模式</th><th class="p-2 text-left">段位</th>
-                            <th class="p-2 text-left">原时间段</th><th class="p-2 text-left">操作</th>
+                            <th class="p-2 text-left">原时间段</th><th class="p-2 text-left">修改为</th><th class="p-2 text-left">操作</th>
                         </tr></thead>
                         <tbody id="adminEditList"></tbody>
                     </table>
@@ -198,8 +197,9 @@
                     <table class="w-full min-w-[500px] border text-sm">
                         <thead class="bg-gray-100"><tr>
                             <th class="p-2 text-left">昵称</th>
-                            <th class="p-2 text-left">预约次数</th>
-                            <th class="p-2 text-left">等级</th>
+                            <th class="p-2 text-left">有效预约数</th>
+                            <th class="p-2 text-left">当前等级</th>
+                            <th class="p-2 text-left">修改等级</th>
                         </tr></thead>
                         <tbody id="adminUserList"></tbody>
                     </table>
@@ -210,54 +210,46 @@
 
     <div id="successBox" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-xl max-w-sm w-full">
-            <h3 class="text-lg font-bold text-green-600 mb-3">✅ 预约成功</h3>
-            <p class="mb-4">你的预约已提交成功</p>
-            <button id="successClose" class="px-4 py-2 bg-indigo-600 text-white rounded">确定</button>
+            <h3 class="text-lg font-bold text-green-600 mb-3">✅ 操作成功</h3>
+            <p class="mb-4">已完成对应操作</p>
+            <button id="successClose" class="px-4 py-2 bg-primary text-white rounded">确定</button>
         </div>
     </div>
 </main>
 
-<footer class="text-center py-4 text-sm text-gray-500">
-    <p>王者荣耀开黑预约系统 &copy; 2025</p>
-    <p>时段开始前12小时截止预约 | 每人每周限约次数按等级而定 | 每时段最多2人</p>
+<footer class="bg-secondary text-white py-4 text-center text-sm">
+    <p>王者荣耀开黑预约系统 &copy; 2026</p>
+    <p class="text-gray-400 mt-1">时段前12小时截止 | 每周日22:00刷新 | 每时段最多2人</p>
 </footer>
 
 <script>
-// ====================== 后端配置 ======================
-const API_BASE = 'http://bensonnxfwzrycom-production.up.railway.app';
+const API_BASE = 'http://localhost:8080/api';
 axios.defaults.baseURL = API_BASE;
 axios.defaults.headers.post['Content-Type'] = 'application/json';
 
 const LOGIN_KEY = 'loginUser';
 const ALL_SLOTS = generateWeekSlots();
 
-// ====================== 仅获取人数与用户信息 ======================
-async function getReserveCountMap() {
+// 获取全量预约列表（用于统计人数、我的预约、管理员列表）
+async function getReserveList() {
     try {
-        const list = (await axios.get('/reserve/list')).data || [];
-        const map = {};
-        list.forEach(r => {
-            const key = r.date + '|' + r.startTime;
-            map[key] = (map[key] || 0) + 1;
-        });
-        return map;
-    } catch (e) { return {}; }
+        return (await axios.get('/reserve/list')).data || [];
+    } catch (e) {
+        console.error(e);
+        return [];
+    }
 }
 
-async function getUsers() {
+// 获取用户列表
+async function getUserList() {
     try {
         return (await axios.get('/user/list')).data || [];
-    } catch (e) { return []; }
+    } catch (e) {
+        return [];
+    }
 }
 
-async function getMyReserves(name) {
-    try {
-        const list = (await axios.get('/reserve/list')).data || [];
-        return list.filter(r => r.name === name);
-    } catch (e) { return []; }
-}
-
-// ====================== 时间判断：本地计算 ======================
+// 时间段是否开放：本地时间判断，不联网
 function getSlotTime(slot) {
     const [h, m] = slot.start.split(':').map(Number);
     const dt = new Date(slot.date);
@@ -273,11 +265,12 @@ function isSlotOpen(slot) {
     return now < dead;
 }
 
-// ====================== 初始化视图：只执行1次 ======================
+// 初始化时间段视图：只执行一次
 function initSlotView() {
     const c = document.getElementById('userSlotContainer');
     const s = document.getElementById('userSlot');
     c.innerHTML = '';
+    s.innerHTML = '';
 
     ALL_SLOTS.forEach((slot, i) => {
         const div = document.createElement('div');
@@ -287,7 +280,7 @@ function initSlotView() {
         <div class="flex justify-between"><b>${slot.day}</b><span class="text-sm text-gray-500">${slot.date}</span></div>
         <div class="my-2">${slot.start} - ${slot.end}</div>
         <div class="text-sm slot-status"></div>
-        <div class="text-xs mt-1 text-gray-400 slot-count"></div>`;
+        <div class="text-xs mt-1 text-gray-500 slot-count"></div>`;
         c.appendChild(div);
 
         const opt = document.createElement('option');
@@ -297,17 +290,25 @@ function initSlotView() {
     });
 }
 
-// ====================== 每2秒仅刷新：人数 + 等级 ======================
-async function refreshOnlyCountAndUserInfo() {
+// 只联网刷新：人数、状态、我的预约、用户等级
+async function refreshDynamicData() {
     const loginUser = localStorage.getItem(LOGIN_KEY);
     if (!loginUser) return;
 
-    const countMap = await getReserveCountMap();
-    const cards = document.querySelectorAll('.slot-card');
-    cards.forEach(card => {
+    const reserves = await getReserveList();
+    const users = await getUserList();
+
+    // 1. 更新各时间段人数
+    const countMap = {};
+    reserves.forEach(r => {
+        const k = r.date + '|' + r.startTime;
+        countMap[k] = (countMap[k] || 0) + 1;
+    });
+
+    document.querySelectorAll('.slot-card').forEach(card => {
         const i = card.dataset.index;
         const slot = ALL_SLOTS[i];
-        const key = slot.date + '|' + slot.startTime;
+        const key = slot.date + '|' + slot.start;
         const cnt = countMap[key] || 0;
         const open = isSlotOpen(slot);
         const full = cnt >= 2;
@@ -320,31 +321,16 @@ async function refreshOnlyCountAndUserInfo() {
         countEl.textContent = `已预约：${cnt}/2`;
     });
 
-    await renderMyReserves(loginUser);
-    await refreshUserLevelAndRemain(loginUser);
+    // 2. 更新我的预约
+    const myList = reserves.filter(r => r.name === loginUser);
+    renderMyReserveList(myList);
+
+    // 3. 更新用户等级与剩余次数
+    updateUserInfo(loginUser, users, myList);
 }
 
-// ====================== 用户等级、剩余次数 ======================
-async function refreshUserLevelAndRemain(name) {
-    const users = await getUsers();
-    const user = users.find(u => u.name === name) || { name, level: '普通用户', total: 0 };
-    document.getElementById('showLevel').textContent = user.level;
-
-    const week = getWeekStart();
-    const myList = await getMyReserves(name);
-    const used = myList.filter(r => r.week === week).length;
-
-    const max = user.level === 'SVIP用户' ? 999
-              : user.level === 'VIP用户' ? 4
-              : user.level === '高级用户' ? 3 : 2;
-
-    document.getElementById('remainNum').textContent = max - used;
-    document.getElementById('remainTip').classList.remove('hidden');
-}
-
-// ====================== 我的预约 ======================
-async function renderMyReserves(name) {
-    const myList = await getMyReserves(name);
+// 渲染我的预约列表
+function renderMyReserveList(myList) {
     const html = myList.map((r, idx) => {
         const slot = ALL_SLOTS[r.slotIdx] || {};
         const time = slot.day ? `${slot.day} ${slot.date} ${slot.start}` : '已过期';
@@ -354,18 +340,35 @@ async function renderMyReserves(name) {
             <td class="p-2">${r.rank}</td>
             <td class="p-2">${time}</td>
             <td class="p-2">
-                <button onclick="cancelMyReserve(${idx})" class="text-red-600">取消预约</button>
+                <button onclick="cancelReserve(${idx})" class="text-red-600">取消预约</button>
             </td>
         </tr>`;
     }).join('') || '<tr><td colspan="4" class="p-2 text-center">暂无预约记录</td></tr>';
     document.getElementById('myReserveList').innerHTML = html;
 }
 
-window.cancelMyReserve = async function (idx) {
+// 更新用户等级、本周剩余次数
+function updateUserInfo(name, users, myList) {
+    const user = users.find(u => u.name === name) || { name, level: '普通用户' };
+    document.getElementById('showLevel').textContent = user.level;
+
+    const week = getWeekStart();
+    const used = myList.filter(r => r.week === week).length;
+    const max = user.level === 'SVIP用户' ? 999
+              : user.level === 'VIP用户' ? 4
+              : user.level === '高级用户' ? 3 : 2;
+
+    document.getElementById('remainNum').textContent = max - used;
+    document.getElementById('remainTip').classList.remove('hidden');
+}
+
+// 取消预约
+window.cancelReserve = async function (idx) {
     const name = localStorage.getItem(LOGIN_KEY);
-    const myList = await getMyReserves(name);
+    const list = await getReserveList();
+    const myList = list.filter(r => r.name === name);
     const tar = myList[idx];
-    if (!confirm('确定取消该预约？')) return;
+    if (!confirm('确定取消预约？')) return;
 
     try {
         await axios.post('/reserve/delete', {
@@ -373,189 +376,31 @@ window.cancelMyReserve = async function (idx) {
             date: tar.date,
             startTime: tar.startTime
         });
-        refreshOnlyCountAndUserInfo();
+        refreshDynamicData();
         showStatus('取消成功', 'success');
     } catch (e) {
         showStatus('操作失败', 'error');
     }
 };
 
-// ====================== 工具函数 ======================
-function showStatus(text, type = 'info') {
-    const bar = document.getElementById('statusBar');
-    const t = document.getElementById('statusText');
-    t.textContent = text;
-    bar.className = 'mb-6 p-3 rounded-lg text-sm hidden';
-    if (type === 'success') bar.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
-    else if (type === 'error') bar.classList.add('bg-red-50', 'border-red-200', 'text-red-700');
-    else bar.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
-    bar.classList.remove('hidden');
-    setTimeout(() => bar.classList.add('hidden'), 3000);
-}
-
-function getWeekStart(date = new Date()) {
-    const d = new Date(date);
-    const day = d.getDay() || 7;
-    d.setDate(d.getDate() - day + 1);
-    d.setHours(0,0,0,0);
-    return d.toISOString().split('T')[0];
-}
-
-function generateWeekSlots() {
-    const now = new Date();
-    const slots = [];
-    const dayNames = ['周一','周二','周三','周四','周五','周六','周日'];
-    const add = (now.getDay() === 0 && now.getHours() >= 22) ? 7 : 0;
-    for(let i=0;i<7;i++){
-        const d = new Date();
-        d.setDate(now.getDate() - now.getDay() + i + 1 + add);
-        const date = d.toISOString().split('T')[0];
-        const day = dayNames[i];
-        const isWeekend = i >=5;
-        if(isWeekend){
-            slots.push({date,day,start:'09:30',end:'12:00'});
-            slots.push({date,day,start:'14:00',end:'16:00'});
-            slots.push({date,day,start:'17:20',end:'21:20'});
-            slots.push({date,day,start:'21:30',end:'23:10'});
-        }else{
-            slots.push({date,day,start:'21:30',end:'23:00'});
-        }
-    }
-    return slots;
-}
-
-// ====================== 管理员 ======================
-function showAdminPage(key){
-    document.querySelectorAll('.admin-page').forEach(el=>el.style.display='none');
-    if(key==='detail'){
-        document.getElementById('adminDetailPage').style.display='block';
-        renderAdminDetail();
-    }else if(key==='help'){
-        document.getElementById('adminHelpPage').style.display='block';
-    }else if(key==='edit'){
-        document.getElementById('adminEditPage').style.display='block';
-        renderAdminEdit();
-    }else if(key==='user'){
-        document.getElementById('adminUserPage').style.display='block';
-        renderAdminUser();
-    }
-}
-
-async function renderAdminDetail(){
-    const list = (await axios.get('/reserve/list')).data || [];
-    const html = list.map(r => {
-        const slot = ALL_SLOTS[r.slotIdx] || {};
-        const time = slot.day ? `${slot.day} ${slot.date} ${slot.start}` : '已过期';
-        return `<tr>
-            <td class="p-2">${r.name}</td>
-            <td class="p-2">${r.level || '普通用户'}</td>
-            <td class="p-2">${r.mode}</td>
-            <td class="p-2">${r.rank}</td>
-            <td class="p-2">${time}</td>
-        </tr>`;
-    }).join('') || '<tr><td colspan="5" class="p-2 text-center">暂无预约</td></tr>';
-    document.getElementById('adminDetailList').innerHTML = html;
-}
-
-async function renderAdminEdit(){
-    const list = (await axios.get('/reserve/list')).data || [];
-    let html = '';
-    list.forEach((r, idx) => {
-        const slot = ALL_SLOTS[r.slotIdx] || {};
-        html += `<tr>
-            <td class="p-2">${r.name}</td>
-            <td class="p-2">${r.mode}</td>
-            <td class="p-2">${r.rank}</td>
-            <td class="p-2">${slot.day} ${slot.start}</td>
-            <td class="p-2">
-                <button onclick="adminDel(${idx})" class="text-red-600">删除</button>
-            </td>
-        </tr>`;
-    });
-    document.getElementById('adminEditList').innerHTML = html || '<tr><td colspan="5" class="p-2 text-center">暂无预约</td></tr>';
-}
-
-async function renderAdminUser(){
-    const users = (await getUsers()).filter(u=>u.name!=='楠小小风865370');
-    const html = users.map(u => `
-    <tr>
-        <td class="p-2">${u.name}</td>
-        <td class="p-2">${u.total}</td>
-        <td class="p-2">${u.level}</td>
-    </tr>`).join('') || '<tr><td colspan="3" class="p-2 text-center">暂无用户</td></tr>';
-    document.getElementById('adminUserList').innerHTML = html;
-}
-
-window.adminDel = async function(idx){
-    const list = (await axios.get('/reserve/list')).data || [];
-    const r = list[idx];
-    await axios.post('/reserve/delete', {
-        nickName: r.name, date: r.date, startTime: r.startTime
-    });
-    renderAdminDetail();
-    renderAdminEdit();
-};
-
-// ====================== 登录 ======================
-function logout(){
-    localStorage.removeItem(LOGIN_KEY);
-    location.reload();
-}
-document.getElementById('logoutBtn').onclick = logout;
-
-async function afterLogin(name){
-    document.getElementById('loginBox').classList.add('hidden');
-    document.getElementById('userInfo').classList.remove('hidden');
-    document.getElementById('logoutBtn').classList.remove('hidden');
-    document.getElementById('showName').textContent = name;
-
-    if(name === '楠小小风865370'){
-        document.getElementById('adminMain').classList.remove('hidden');
-        document.getElementById('userMain').classList.add('hidden');
-        document.getElementById('showLevel').textContent = '【管理员】';
-        showAdminPage('detail');
-        return;
-    }
-
-    document.getElementById('userMain').classList.remove('hidden');
-    document.getElementById('adminMain').classList.add('hidden');
-    document.getElementById('userNick').value = name;
-    initSlotView();
-    refreshOnlyCountAndUserInfo();
-}
-
-document.getElementById('loginBtn').onclick = function(){
-    const name = document.getElementById('loginNick').value.trim();
-    if(!name) return showStatus('请输入昵称');
-    localStorage.setItem(LOGIN_KEY, name);
-    afterLogin(name);
-};
-
-// ====================== 提交预约（修复完成） ======================
-document.getElementById('userReserveForm').onsubmit = async e => {
+// 提交预约（用户端）
+document.getElementById('userReserveForm').onsubmit = async function (e) {
     e.preventDefault();
-
     const name = document.getElementById('userNick').value.trim();
-    const mode = document.getElementById('userMode').value.trim();
+    const mode = document.getElementById('userMode').value;
     const rank = document.getElementById('userRank').value.trim();
     const slotIdx = document.getElementById('userSlot').value;
-
-    if(!mode || !rank || slotIdx === ""){
-        showStatus('请填写完整信息', 'error');
-        return;
-    }
-
     const slot = ALL_SLOTS[slotIdx];
-    const countMap = await getReserveCountMap();
-    const cnt = countMap[slot.date + '|' + slot.startTime] || 0;
 
-    if(!isSlotOpen(slot)){
-        showStatus('该时间段已截止预约', 'error');
-        return;
-    }
-    if(cnt >= 2){
-        showStatus('该时间段已满员', 'error');
-        return;
+    if (!name || !mode || !rank || slotIdx === undefined) return showStatus('请完善信息');
+
+    const list = await getReserveList();
+    const cnt = list.filter(r => r.date === slot.date && r.startTime === slot.start).length;
+
+    if (!isSlotOpen(slot)) return showStatus('该时间段已截止');
+    if (cnt >= 2) return showStatus('该时间段已满员');
+    if (list.some(r => r.name === name && r.date === slot.date && r.startTime === slot.start)) {
+        return showStatus('你已预约过该时间段');
     }
 
     try {
@@ -568,24 +413,226 @@ document.getElementById('userReserveForm').onsubmit = async e => {
             startTime: slot.start,
             week: getWeekStart()
         });
-
-        refreshOnlyCountAndUserInfo();
+        refreshDynamicData();
         document.getElementById('successBox').classList.remove('hidden');
-        document.getElementById('userReserveForm').reset();
     } catch (err) {
-        showStatus('提交失败，请稍后重试', 'error');
+        showStatus('预约提交失败', 'error');
     }
+};
+
+// ===================== 管理员 =====================
+function showAdminPage(key) {
+    document.querySelectorAll('.admin-page').forEach(el => el.style.display = 'none');
+    if (key === 'detail') {
+        document.getElementById('adminDetailPage').style.display = 'block';
+        renderAdminReserveList();
+    } else if (key === 'help') {
+        document.getElementById('adminHelpPage').style.display = 'block';
+        fillAdminSlotSelect();
+    } else if (key === 'edit') {
+        document.getElementById('adminEditPage').style.display = 'block';
+        renderAdminEditList();
+    } else if (key === 'user') {
+        document.getElementById('adminUserPage').style.display = 'block';
+        renderAdminUserList();
+    }
+}
+
+async function renderAdminReserveList() {
+    const list = await getReserveList();
+    const html = list.map(r => {
+        const slot = ALL_SLOTS[r.slotIdx] || {};
+        return `<tr>
+            <td class="p-2">${r.name}</td>
+            <td class="p-2">${r.level || '普通用户'}</td>
+            <td class="p-2">${r.mode}</td>
+            <td class="p-2">${r.rank}</td>
+            <td class="p-2">${slot.day || ''} ${slot.date} ${slot.start}</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="5" class="p-2 text-center">暂无预约</td></tr>';
+    document.getElementById('adminDetailList').innerHTML = html;
+}
+
+async function renderAdminEditList() {
+    const list = await getReserveList();
+    let html = '';
+    list.forEach((r, idx) => {
+        const slot = ALL_SLOTS[r.slotIdx] || {};
+        html += `<tr>
+            <td class="p-2">${r.name}</td>
+            <td class="p-2">${r.mode}</td>
+            <td class="p-2">${r.rank}</td>
+            <td class="p-2">${slot.day} ${slot.start}</td>
+            <td class="p-2">—</td>
+            <td class="p-2">
+                <button onclick="adminDel(${idx})" class="text-red-600">删除</button>
+            </td>
+        </tr>`;
+    });
+    document.getElementById('adminEditList').innerHTML = html || '<tr><td colspan="6" class="p-2 text-center">暂无预约</td></tr>';
+}
+
+window.adminDel = async function (idx) {
+    const list = await getReserveList();
+    const r = list[idx];
+    if (!confirm('确定删除？')) return;
+    await axios.post('/reserve/delete', {
+        nickName: r.name, date: r.date, startTime: r.startTime
+    });
+    showAdminPage('detail');
+};
+
+async function renderAdminUserList() {
+    const users = (await getUserList()).filter(u => u.name !== '楠小小风865370');
+    const html = users.map((u, i) => `
+    <tr>
+        <td class="p-2">${u.name}</td>
+        <td class="p-2">${u.total || 0}</td>
+        <td class="p-2">${u.level}</td>
+        <td class="p-2">
+            <select class="border p-1" onchange="changeLevel(${i}, this.value)">
+                <option value="普通用户" ${u.level === '普通用户' ? 'selected' : ''}>普通用户</option>
+                <option value="高级用户" ${u.level === '高级用户' ? 'selected' : ''}>高级用户</option>
+                <option value="VIP用户" ${u.level === 'VIP用户' ? 'selected' : ''}>VIP用户</option>
+                <option value="SVIP用户" ${u.level === 'SVIP用户' ? 'selected' : ''}>SVIP用户</option>
+            </select>
+        </td>
+    </tr>`).join('') || '<tr><td colspan="4" class="p-2 text-center">暂无用户</td></tr>';
+    document.getElementById('adminUserList').innerHTML = html;
+}
+
+window.changeLevel = async function (idx, lv) {
+    const users = (await getUserList()).filter(u => u.name !== '楠小小风865370');
+    const tar = users[idx];
+    await axios.post('/user/updateLevel', { id: tar.id, level: lv });
+    showStatus('修改成功', 'success');
+};
+
+function fillAdminSlotSelect() {
+    const sel = document.getElementById('helpSlot');
+    sel.innerHTML = '';
+    ALL_SLOTS.forEach((slot, i) => {
+        if (isSlotOpen(slot)) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = `${slot.day} ${slot.date} ${slot.start}`;
+            sel.appendChild(opt);
+        }
+    });
+}
+
+document.getElementById('adminHelpForm').onsubmit = async e => {
+    e.preventDefault();
+    const name = document.getElementById('helpNick').value.trim();
+    const mode = document.getElementById('helpMode').value;
+    const rank = document.getElementById('helpRank').value.trim();
+    const slotIdx = document.getElementById('helpSlot').value;
+    const slot = ALL_SLOTS[slotIdx];
+
+    const list = await getReserveList();
+    const cnt = list.filter(r => r.date === slot.date && r.startTime === slot.start).length;
+    if (cnt >= 2) return showStatus('已满员');
+
+    await axios.post('/reserve/add', {
+        name, mode, rank,
+        slotIdx: +slotIdx,
+        date: slot.date,
+        startTime: slot.start,
+        week: getWeekStart()
+    });
+
+    showAdminPage('detail');
+    document.getElementById('successBox').classList.remove('hidden');
+};
+
+// ===================== 工具 =====================
+function showStatus(text, type = 'info') {
+    const bar = document.getElementById('statusBar');
+    const t = document.getElementById('statusText');
+    t.textContent = text;
+    bar.className = 'mb-6 p-3 rounded-lg text-sm hidden';
+    if (type === 'success') bar.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
+    else if (type === 'error') bar.classList.add('bg-red-50', 'border-red-200', 'text-red-700');
+    else bar.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
+    bar.classList.remove('hidden');
+    setTimeout(() => bar.classList.add('hidden'), 2500);
+}
+
+function getWeekStart(date = new Date()) {
+    const d = new Date(date);
+    const day = d.getDay() || 7;
+    d.setDate(d.getDate() - day + 1);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().split('T')[0];
+}
+
+function generateWeekSlots() {
+    const now = new Date();
+    const slots = [];
+    const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const addWeek = (now.getDay() === 0 && now.getHours() >= 22) ? 7 : 0;
+    for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(now.getDate() - now.getDay() + i + 1 + addWeek);
+        const date = d.toISOString().split('T')[0];
+        const day = dayNames[i];
+        const isWeekend = i >= 5;
+        if (isWeekend) {
+            slots.push({ date, day, start: '09:30', end: '12:00' });
+            slots.push({ date, day, start: '14:00', end: '16:00' });
+            slots.push({ date, day, start: '17:20', end: '21:20' });
+            slots.push({ date, day, start: '21:30', end: '23:10' });
+        } else {
+            slots.push({ date, day, start: '21:30', end: '23:00' });
+        }
+    }
+    return slots;
+}
+
+// ===================== 登录 =====================
+function logout() {
+    localStorage.removeItem(LOGIN_KEY);
+    location.reload();
+}
+document.getElementById('logoutBtn').onclick = logout;
+
+async function afterLogin(name) {
+    document.getElementById('loginBox').classList.add('hidden');
+    document.getElementById('userInfo').classList.remove('hidden');
+    document.getElementById('logoutBtn').classList.remove('hidden');
+    document.getElementById('showName').textContent = name;
+
+    if (name === '楠小小风865370') {
+        document.getElementById('adminMain').classList.remove('hidden');
+        document.getElementById('userMain').classList.add('hidden');
+        document.getElementById('showLevel').textContent = '【管理员】';
+        showAdminPage('detail');
+        return;
+    }
+
+    document.getElementById('userMain').classList.remove('hidden');
+    document.getElementById('adminMain').classList.add('hidden');
+    document.getElementById('userNick').value = name;
+    initSlotView();
+    refreshDynamicData();
+}
+
+document.getElementById('loginBtn').onclick = function () {
+    const name = document.getElementById('loginNick').value.trim();
+    if (!name) return showStatus('请输入昵称');
+    localStorage.setItem(LOGIN_KEY, name);
+    afterLogin(name);
 };
 
 document.getElementById('successClose').onclick = () => {
     document.getElementById('successBox').classList.add('hidden');
 };
 
-// ====================== 启动 ======================
-window.onload = function(){
+// 启动
+window.onload = function () {
     const user = localStorage.getItem(LOGIN_KEY);
-    if(user) afterLogin(user);
-    setInterval(refreshOnlyCountAndUserInfo, 2000);
+    if (user) afterLogin(user);
+    setInterval(refreshDynamicData, 2000);
 };
 </script>
 </body>
