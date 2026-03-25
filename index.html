@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>开黑预约系统</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: { extend: { colors: { primary: '#C41E3A', secondary: '#1E293B', accent: '#FBBF24' } } }
+}
+</script>
+<style>.admin-page{display:none;}</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<header class="bg-secondary text-white sticky top-0">
+  <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+    <div class="flex items-center gap-2">
+      <i class="fa fa-gamepad text-accent text-2xl"></i>
+      <h1 class="text-xl font-bold">王者荣耀开黑预约系统</h1>
+    </div>
+    <div id="userInfo" class="hidden text-sm px-2 py-1 bg-white/10 rounded">
+      欢迎：<span id="showName"></span>
+    </div>
+    <button id="logoutBtn" class="hidden bg-red-600 text-xs px-2 py-1 rounded">退出</button>
+  </div>
+</header>
+
+<main class="container mx-auto px-4 py-6">
+  <div id="status" class="mb-4 p-3 rounded bg-blue-50 border border-blue-200 hidden"></div>
+
+  <div id="loginBox" class="bg-white rounded-xl p-6 shadow max-w-md mx-auto">
+    <h2 class="text-xl font-bold mb-4 text-center">登录</h2>
+    <input type="text" id="nick" placeholder="游戏昵称" class="w-full px-4 py-2 border rounded mb-4">
+    <button id="loginBtn" class="w-full bg-primary text-white py-2 rounded">登录</button>
+  </div>
+
+  <div id="main" class="hidden">
+    <div class="bg-white rounded-xl p-5 shadow mb-6">
+      <h3 class="font-bold mb-3">我要预约</h3>
+      <form id="form" class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-sm">昵称</label>
+          <input id="userNick" readonly class="w-full border p-2 rounded bg-gray-50">
+        </div>
+        <div>
+          <label class="text-sm">模式</label>
+          <select id="mode" required class="w-full border p-2 rounded">
+            <option value="">请选择</option>
+            <option value="娱乐模式">娱乐模式</option>
+            <option value="技术模式">技术模式</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm">段位</label>
+          <input id="rank" required placeholder="王者10星" class="w-full border p-2 rounded">
+        </div>
+        <div>
+          <label class="text-sm">时间段</label>
+          <select id="slot" required class="w-full border p-2 rounded"></select>
+        </div>
+        <div class="md:col-span-2">
+          <button type="submit" class="w-full bg-primary text-white py-2 rounded">提交预约</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="bg-white rounded-xl p-5 shadow mb-6">
+      <h3 class="font-bold mb-3">我的预约</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full border text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="p-2 text-left">模式</th>
+              <th class="p-2 text-left">段位</th>
+              <th class="p-2 text-left">时间</th>
+              <th class="p-2 text-left">操作</th>
+            </tr>
+          </thead>
+          <tbody id="myList"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl p-5 shadow">
+      <h3 class="font-bold mb-3">时段状态</h3>
+      <div id="slotBox" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ========== 这里等下要替换成你的后端地址 ==========
+const API = "https://你的后端地址.onrender.com/api";
+
+let loginUser = localStorage.getItem("loginUser");
+let reservations = [];
+
+function showMsg(text, isErr = false) {
+  const s = document.getElementById("status");
+  s.textContent = text;
+  s.classList.remove("hidden");
+  s.className = "mb-4 p-3 rounded text-sm hidden";
+  s.classList.add(isErr ? "bg-red-50 border-red-200 text-red-700" : "bg-blue-50 border-blue-200 text-blue-700");
+  setTimeout(() => s.classList.add("hidden"), 2000);
+}
+
+function getWeekStart() {
+  const d = new Date();
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() - day + 1);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().split("T")[0];
+}
+
+function genSlots() {
+  const slots = [];
+  const days = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay() + i + 1);
+    const date = d.toISOString().split("T")[0];
+    const day = days[i];
+    const isWeekend = i >= 5;
+    if (isWeekend) {
+      slots.push({ date, day, start: "09:30", end: "12:00" });
+      slots.push({ date, day, start: "14:00", end: "16:00" });
+      slots.push({ date, day, start: "17:20", end: "21:20" });
+      slots.push({ date, day, start: "21:30", end: "23:10" });
+    } else {
+      slots.push({ date, day, start: "21:30", end: "23:00" });
+    }
+  }
+  return slots;
+}
+
+function isOpen(slot) {
+  const now = new Date();
+  const st = new Date(slot.date + "T" + slot.start);
+  if (now >= st) return false;
+  const dead = new Date(st - 12 * 60 * 60 * 1000);
+  return now < dead;
+}
+
+async function load() {
+  try {
+    const r = await fetch(API + "/reservations");
+    reservations = await r.json();
+    refresh();
+  } catch (e) {
+    showMsg("连接服务器失败", true);
+  }
+}
+
+setInterval(load, 2000);
+
+function refresh() {
+  const slots = genSlots();
+  const box = document.getElementById("slotBox");
+  const sel = document.getElementById("slot");
+  box.innerHTML = "";
+  sel.innerHTML = '<option value="">选择时段</option>';
+
+  slots.forEach((slot, i) => {
+    const cnt = reservations.filter(r => r.date === slot.date && r.start === slot.start).length;
+    const open = isOpen(slot);
+    const full = cnt >= 2;
+    const txt = open ? (full ? "已满" : "可预约") : "已截止";
+
+    const div = document.createElement("div");
+    div.className = "p-4 rounded bg-white shadow";
+    div.innerHTML = `
+      <div class="flex justify-between"><b>${slot.day}</b><span class="text-sm text-gray-500">${slot.date}</span></div>
+      <div class="my-1">${slot.start}-${slot.end}</div>
+      <div class="text-sm ${!open||full?'text-red-600':'text-green-600'}">${txt}（${cnt}/2）</div>`;
+    box.appendChild(div);
+
+    if (open && !full) {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `${slot.day} ${slot.start}`;
+      sel.appendChild(opt);
+    }
+  });
+
+  const my = reservations.filter(r => r.name === loginUser);
+  const myList = document.getElementById("myList");
+  myList.innerHTML = my.map((item, idx) => {
+    const s = slots[item.slotIdx] || {};
+    return `
+    <tr>
+      <td class="p-2">${item.mode}</td>
+      <td class="p-2">${item.rank}</td>
+      <td class="p-2">${s.day||""} ${s.start||""}</td>
+      <td class="p-2"><button onclick="cancel(${idx})" class="text-red-600">取消</button></td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="4" class="p-2 text-center">暂无预约</td></tr>';
+}
+
+async function cancel(idx) {
+  if (!confirm("确定取消？")) return;
+  const my = reservations.filter(r => r.name === loginUser)[idx];
+  await fetch(API + "/reservations", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: loginUser, date: my.date, start: my.start })
+  });
+  load();
+  showMsg("已取消");
+}
+
+document.getElementById("form").onsubmit = async e => {
+  e.preventDefault();
+  const mode = document.getElementById("mode").value;
+  const rank = document.getElementById("rank").value;
+  const slotIdx = document.getElementById("slot").value;
+  if (!mode || !rank || slotIdx === "") return showMsg("请完善信息", true);
+
+  const slots = genSlots();
+  const slot = slots[slotIdx];
+  const week = getWeekStart();
+
+  const has = reservations.some(r => r.name === loginUser && r.date === slot.date && r.start === slot.start);
+  if (has) return showMsg("已预约过此时段", true);
+
+  const cnt = reservations.filter(r => r.date === slot.date && r.start === slot.start).length;
+  if (cnt >= 2) return showMsg("时段已满", true);
+
+  await fetch(API + "/reservations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: loginUser, mode, rank,
+      slotIdx: +slotIdx, date: slot.date, start: slot.start, week
+    })
+  });
+
+  load();
+  showMsg("预约成功");
+};
+
+document.getElementById("loginBtn").onclick = () => {
+  const nick = document.getElementById("nick").value.trim();
+  if (!nick) return showMsg("请输入昵称", true);
+  loginUser = nick;
+  localStorage.setItem("loginUser", nick);
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("main").classList.remove("hidden");
+  document.getElementById("userInfo").classList.remove("hidden");
+  document.getElementById("showName").textContent = nick;
+  load();
+};
+
+window.onload = () => {
+  if (loginUser) {
+    document.getElementById("loginBox").classList.add("hidden");
+    document.getElementById("main").classList.remove("hidden");
+    document.getElementById("userInfo").classList.remove("hidden");
+    document.getElementById("showName").textContent = loginUser;
+    load();
+  }
+};
+</script>
+</body>
+</html>
