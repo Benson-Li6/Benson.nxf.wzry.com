@@ -223,498 +223,494 @@
 </footer>
 
 <script>
-// ====================== 后端接口配置（你只需要改这里）======================
-const API_BASE = 'http://localhost:8080/api'; // 换成你真实后端地址
+    const GLOBAL_KEY_RESERVE = 'global_reservations';
+    const GLOBAL_KEY_USERS   = 'global_users';
 
-// 统一请求工具
-async function apiRequest(url, method = 'GET', body = null) {
-    try {
-        const opts = {
-            method,
-            headers: { 'Content-Type': 'application/json' }
-        };
-        if (body) opts.body = JSON.stringify(body);
-        const res = await fetch(API_BASE + url, opts);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.msg || '请求失败');
-        return data;
-    } catch (e) {
-        showStatus(e.message, 'error');
-        throw e;
-    }
-}
-
-// ====================== 替换原来 localStorage 的 getData / setData ======================
-// 获取所有预约
-async function getReserves() {
-    const data = await apiRequest('/reserves');
-    return data.list || [];
-}
-
-// 获取所有用户
-async function getUsers() {
-    const data = await apiRequest('/users');
-    return data.list || [];
-}
-
-// 新增预约
-async function addReserve(item) {
-    return apiRequest('/reserve', 'POST', item);
-}
-
-// 删除预约
-async function deleteReserve(index) {
-    return apiRequest('/reserve/' + index, 'DELETE');
-}
-
-// 更新预约时间段
-async function updateReserveSlot(index, newSlotIdx) {
-    return apiRequest('/reserve/' + index, 'PATCH', { slotIdx: newSlotIdx });
-}
-
-// 设置用户等级
-async function setUserLevel(name, level) {
-    return apiRequest('/user/level', 'POST', { name, level });
-}
-
-// ====================== 以下基本没动，只把同步改成异步 ======================
-function showStatus(text, type = 'info') {
-    const bar = document.getElementById('statusBar');
-    const t = document.getElementById('statusText');
-    t.textContent = text;
-    bar.className = 'mb-6 p-3 rounded-lg text-sm hidden';
-    if (type === 'success') bar.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
-    else if (type === 'error') bar.classList.add('bg-red-50', 'border-red-200', 'text-red-700');
-    else bar.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
-    bar.classList.remove('hidden');
-    setTimeout(() => bar.classList.add('hidden'), 3000);
-}
-
-function getWeekStart(date = new Date()) {
-    const d = new Date(date);
-    const day = d.getDay() || 7;
-    d.setDate(d.getDate() - day + 1);
-    d.setHours(0,0,0,0);
-    return d.toISOString().split('T')[0];
-}
-
-function generateWeekSlots() {
-    const now = new Date();
-    const slots = [];
-    const dayNames = ['周一','周二','周三','周四','周五','周六','周日'];
-    const add = (now.getDay() === 0 && now.getHours() >= 22) ? 7 : 0;
-    for(let i=0;i<7;i++){
-        const d = new Date();
-        d.setDate(now.getDate() - now.getDay() + i + 1 + add);
-        const date = d.toISOString().split('T')[0];
-        const day = dayNames[i];
-        const isWeekend = i >=5;
-        if(isWeekend){
-            slots.push({date,day,start:'09:30',end:'12:00'});
-            slots.push({date,day,start:'14:00',end:'16:00'});
-            slots.push({date,day,start:'17:20',end:'21:20'});
-            slots.push({date,day,start:'21:30',end:'23:10'});
-        }else{
-            slots.push({date,day,start:'21:30',end:'23:00'});
+    function getData(key) {
+        try {
+            return JSON.parse(localStorage.getItem(key) || '[]');
+        } catch (e) {
+            return [];
         }
     }
-    return slots;
-}
-
-function getSlotTime(slot){
-    const [h,m] = slot.start.split(':').map(Number);
-    const dt = new Date(slot.date);
-    dt.setHours(h,m,0,0);
-    return dt;
-}
-
-function isSlotOpen(slot){
-    const now = new Date();
-    const st = getSlotTime(slot);
-    if(now >= st) return false;
-    const dead = new Date(st - 12*60*60*1000);
-    return now < dead;
-}
-
-async function getSlotUsedCount(slot){
-    const list = await getReserves();
-    return list.filter(r=>r.date===slot.date&&r.start===slot.start).length;
-}
-
-async function hasUserReservedAtSlot(name, date, start){
-    const list = await getReserves();
-    return list.some(r=>
-        r.name === name &&
-        r.date === date &&
-        r.start === start
-    );
-}
-
-async function getUser(name){
-    let users = await getUsers();
-    let user = users.find(u=>u.name===name);
-    if(!user){
-        user = {name,level:'普通用户',total:0};
+    function setData(key, val) {
+        localStorage.setItem(key, JSON.stringify(val));
     }
-    return user;
-}
 
-async function getWeekReserveCount(name){
-    const list = await getReserves();
-    const week = getWeekStart();
-    return list.filter(r=>r.name===name&&r.week===week).length;
-}
-
-async function getMaxLimit(name){
-    const u = await getUser(name);
-    if(u.level==='SVIP用户') return 999;
-    if(u.level==='VIP用户') return 4;
-    if(u.level==='高级用户') return 3;
-    return 2;
-}
-
-async function showRemainTimes(name){
-    const used = await getWeekReserveCount(name);
-    const max = await getMaxLimit(name);
-    const rem = max - used;
-    document.getElementById('remainNum').textContent = rem;
-    document.getElementById('remainTip').classList.remove('hidden');
-}
-
-async function refreshAllViews() {
-    const loginUser = localStorage.getItem('loginUser');
-    if (loginUser === '楠小小风865370') {
-        await renderAdminDetail();
-        await renderAdminEdit();
-        await renderAdminUser();
-    } else if (loginUser) {
-        await renderUserSlots();
-        await renderMyReserves();
-        await showRemainTimes(loginUser);
-        const u = await getUser(loginUser);
-        document.getElementById('showLevel').textContent = u.level;
+    function showStatus(text, type = 'info') {
+        const bar = document.getElementById('statusBar');
+        const t = document.getElementById('statusText');
+        t.textContent = text;
+        bar.className = 'mb-6 p-3 rounded-lg text-sm hidden';
+        if (type === 'success') bar.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
+        else if (type === 'error') bar.classList.add('bg-red-50', 'border-red-200', 'text-red-700');
+        else bar.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
+        bar.classList.remove('hidden');
+        setTimeout(() => bar.classList.add('hidden'), 3000);
     }
-}
 
-async function renderMyReserves(){
-    const loginUser = localStorage.getItem('loginUser');
-    if(!loginUser) return;
-    const list = await getReserves();
-    const slots = generateWeekSlots();
-    const myList = list.filter(r=>r.name === loginUser);
-    const html = myList.map((r,idx)=>{
-        const slot = slots[r.slotIdx] || {};
-        const time = slot.day ? `${slot.day} ${slot.date} ${slot.start}` : '已过期';
-        return `
-        <tr>
-            <td class="p-2">${r.mode}</td>
-            <td class="p-2">${r.rank}</td>
-            <td class="p-2">${time}</td>
-            <td class="p-2">
-                <button onclick="cancelMyReserve(${idx})" class="text-red-600">取消预约</button>
-            </td>
-        </tr>`;
-    }).join('') || '<tr><td colspan="4" class="p-2 text-center">暂无预约记录</td></tr>';
-    document.getElementById('myReserveList').innerHTML = html;
-}
+    function getWeekStart(date = new Date()) {
+        const d = new Date(date);
+        const day = d.getDay() || 7;
+        d.setDate(d.getDate() - day + 1);
+        d.setHours(0,0,0,0);
+        return d.toISOString().split('T')[0];
+    }
 
-window.cancelMyReserve = async function(realIdx){
-    const loginUser = localStorage.getItem('loginUser');
-    const list = await getReserves();
-    const myList = list.filter(r=>r.name === loginUser);
-    const target = myList[realIdx];
-    const globalIdx = list.findIndex(r=>
-        r.name === target.name &&
-        r.date === target.date &&
-        r.start === target.start
-    );
-    if(globalIdx === -1) return showStatus('预约不存在','error');
-    if(!confirm('确定取消该预约？取消后不计入有效预约数')) return;
+    function generateWeekSlots() {
+        const now = new Date();
+        const slots = [];
+        const dayNames = ['周一','周二','周三','周四','周五','周六','周日'];
+        const add = (now.getDay() === 0 && now.getHours() >= 22) ? 7 : 0;
+        for(let i=0;i<7;i++){
+            const d = new Date();
+            d.setDate(now.getDate() - now.getDay() + i + 1 + add);
+            const date = d.toISOString().split('T')[0];
+            const day = dayNames[i];
+            const isWeekend = i >=5;
+            if(isWeekend){
+                slots.push({date,day,start:'09:30',end:'12:00'});
+                slots.push({date,day,start:'14:00',end:'16:00'});
+                slots.push({date,day,start:'17:20',end:'21:20'});
+                slots.push({date,day,start:'21:30',end:'23:10'});
+            }else{
+                slots.push({date,day,start:'21:30',end:'23:00'});
+            }
+        }
+        return slots;
+    }
 
-    await deleteReserve(globalIdx);
-    await refreshAllViews();
-    showStatus('已取消预约，名额已释放','success');
-}
+    function getSlotTime(slot){
+        const [h,m] = slot.start.split(':').map(Number);
+        const dt = new Date(slot.date);
+        dt.setHours(h,m,0,0);
+        return dt;
+    }
 
-async function renderUserSlots(){
-    const c = document.getElementById('userSlotContainer');
-    const s = document.getElementById('userSlot');
-    const slots = generateWeekSlots();
-    c.innerHTML = '';
-    s.innerHTML = '<option value="">选择预约时间段</option>';
+    function isSlotOpen(slot){
+        const now = new Date();
+        const st = getSlotTime(slot);
+        if(now >= st) return false;
+        const dead = new Date(st - 12*60*60*1000);
+        return now < dead;
+    }
 
-    for(let i=0;i<slots.length;i++){
-        const slot = slots[i];
-        const open = isSlotOpen(slot);
-        const cnt = await getSlotUsedCount(slot);
-        const full = cnt>=2;
-        let txt = open ? (full ? '已满员' : '可预约') : '当前时间不开放';
-        const div = document.createElement('div');
-        div.className = 'bg-white rounded-xl p-4 card-shadow';
-        div.innerHTML = `
-        <div class="flex justify-between"><b>${slot.day}</b><span class="text-sm text-gray-500">${slot.date}</span></div>
-        <div class="my-2">${slot.start} - ${slot.end}</div>
-        <div class="text-sm ${!open||full?'text-red-600':'text-green-600'}">${txt}</div>`;
-        c.appendChild(div);
-        if(open&&!full){
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.textContent = `${slot.day} ${slot.date} ${slot.start}`;
-            s.appendChild(opt);
+    function getSlotUsedCount(slot){
+        const list = getData(GLOBAL_KEY_RESERVE);
+        return list.filter(r=>r.date===slot.date&&r.start===slot.start).length;
+    }
+
+    function hasUserReservedAtSlot(name, date, start){
+        const list = getData(GLOBAL_KEY_RESERVE);
+        return list.some(r=>
+            r.name === name &&
+            r.date === date &&
+            r.start === start
+        );
+    }
+
+    function getUser(name){
+        let users = getData(GLOBAL_KEY_USERS);
+        let user = users.find(u=>u.name===name);
+        if(!user){
+            user = {name,level:'普通用户',total:0};
+            users.push(user);
+            setData(GLOBAL_KEY_USERS, users);
+        }
+        return user;
+    }
+
+    function updateAutoLevel(name){
+        let users = getData(GLOBAL_KEY_USERS);
+        let idx = users.findIndex(u=>u.name===name);
+        if(idx===-1) return;
+        let n = users[idx].total;
+        let lv = '普通用户';
+        if(n>50) lv='SVIP用户';
+        else if(n>25) lv='VIP用户';
+        else if(n>5) lv='高级用户';
+        users[idx].level = lv;
+        setData(GLOBAL_KEY_USERS, users);
+    }
+
+    function getWeekReserveCount(name){
+        const list = getData(GLOBAL_KEY_RESERVE);
+        const week = getWeekStart();
+        return list.filter(r=>r.name===name&&r.week===week).length;
+    }
+
+    function getMaxLimit(name){
+        const u = getUser(name);
+        if(u.level==='SVIP用户') return 999;
+        if(u.level==='VIP用户') return 4;
+        if(u.level==='高级用户') return 3;
+        return 2;
+    }
+
+    function showRemainTimes(name){
+        const used = getWeekReserveCount(name);
+        const max = getMaxLimit(name);
+        const rem = max - used;
+        document.getElementById('remainNum').textContent = rem;
+        document.getElementById('remainTip').classList.remove('hidden');
+    }
+
+    function refreshAllViews() {
+        const loginUser = localStorage.getItem('loginUser');
+        if (loginUser === '楠小小风865370') {
+            renderAdminDetail();
+            renderAdminEdit();
+            renderAdminUser();
+        } else if (loginUser) {
+            renderUserSlots();
+            renderMyReserves();
+            showRemainTimes(loginUser);
+            const u = getUser(loginUser);
+            document.getElementById('showLevel').textContent = u.level;
         }
     }
-}
 
-async function fillAdminSlotSelect(selId){
-    const sel = document.getElementById(selId);
-    const slots = generateWeekSlots();
-    sel.innerHTML = '';
-    for(let i=0;i<slots.length;i++){
-        const slot = slots[i];
-        if(isSlotOpen(slot) && (await getSlotUsedCount(slot)) < 2){
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.textContent = `${slot.day} ${slot.date} ${slot.start}`;
-            sel.appendChild(opt);
+    function renderMyReserves(){
+        const loginUser = localStorage.getItem('loginUser');
+        if(!loginUser) return;
+        const list = getData(GLOBAL_KEY_RESERVE);
+        const slots = generateWeekSlots();
+        const myList = list.filter(r=>r.name === loginUser);
+        const html = myList.map((r,idx)=>{
+            const slot = slots[r.slotIdx] || {};
+            const time = slot.day ? `${slot.day} ${slot.date} ${slot.start}` : '已过期';
+            return `
+            <tr>
+                <td class="p-2">${r.mode}</td>
+                <td class="p-2">${r.rank}</td>
+                <td class="p-2">${time}</td>
+                <td class="p-2">
+                    <button onclick="cancelMyReserve(${idx})" class="text-red-600">取消预约</button>
+                </td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="4" class="p-2 text-center">暂无预约记录</td></tr>';
+        document.getElementById('myReserveList').innerHTML = html;
+    }
+
+    window.cancelMyReserve = function(realIdx){
+        const loginUser = localStorage.getItem('loginUser');
+        let list = getData(GLOBAL_KEY_RESERVE);
+        let myList = list.filter(r=>r.name === loginUser);
+        const target = myList[realIdx];
+        const globalIdx = list.findIndex(r=>
+            r.name === target.name &&
+            r.date === target.date &&
+            r.start === target.start
+        );
+        if(globalIdx === -1) return showStatus('预约不存在','error');
+        if(!confirm('确定取消该预约？取消后不计入有效预约数')) return;
+
+        list.splice(globalIdx, 1);
+        setData(GLOBAL_KEY_RESERVE, list);
+
+        let users = getData(GLOBAL_KEY_USERS);
+        let uidx = users.findIndex(x=>x.name === loginUser);
+        if(uidx !== -1){
+            users[uidx].total = Math.max(0, users[uidx].total - 1);
+            updateAutoLevel(loginUser);
+            setData(GLOBAL_KEY_USERS, users);
         }
+
+        refreshAllViews();
+        showStatus('已取消预约，名额已释放','success');
     }
-}
 
-function showAdminPage(key){
-    document.querySelectorAll('.admin-page').forEach(el=>el.style.display='none');
-    if(key==='detail'){
-        document.getElementById('adminDetailPage').style.display='block';
-        renderAdminDetail();
-    }else if(key==='help'){
-        document.getElementById('adminHelpPage').style.display='block';
-        fillAdminSlotSelect('helpSlot');
-    }else if(key==='edit'){
-        document.getElementById('adminEditPage').style.display='block';
-        renderAdminEdit();
-    }else if(key==='user'){
-        document.getElementById('adminUserPage').style.display='block';
-        renderAdminUser();
-    }
-}
-
-async function renderAdminDetail(){
-    const list = await getReserves();
-    const slots = generateWeekSlots();
-    const html = list.map((r,i)=>{
-        const slot = slots[r.slotIdx]||{};
-        const time = slot.day?`${slot.day} ${slot.date} ${slot.start}`:'已过期';
-        return `<tr>
-            <td class="p-2">${r.name}</td><td class="p-2">加载中...</td>
-            <td class="p-2">${r.mode}</td><td class="p-2">${r.rank}</td><td class="p-2">${time}</td>
-        </tr>`;
-    }).join('')||'<tr><td colspan="5" class="p-2 text-center">暂无预约</td></tr>';
-    document.getElementById('adminDetailList').innerHTML = html;
-
-    // 异步补全等级
-    const users = await getUsers();
-    const rows = document.querySelectorAll('#adminDetailList tr');
-    list.forEach((r,i)=>{
-        const u = users.find(x=>x.name===r.name);
-        if(rows[i] && u) rows[i].children[1].textContent = u.level;
-    });
-}
-
-async function renderAdminEdit(){
-    const list = await getReserves();
-    const slots = generateWeekSlots();
-    const html = list.map((r,idx)=>{
-        const slot = slots[r.slotIdx]||{};
-        const oldTime = slot.day?`${slot.day} ${slot.start}`:'已过期';
-        let options = '';
-        slots.forEach((s,i)=>{
-            if(isSlotOpen(slot)){
-                options+=`<option value="${i}" ${r.slotIdx==i?'selected':''}>${s.day} ${s.start}</option>`;
+    function renderUserSlots(){
+        const c = document.getElementById('userSlotContainer');
+        const s = document.getElementById('userSlot');
+        const slots = generateWeekSlots();
+        c.innerHTML = '';
+        s.innerHTML = '<option value="">选择预约时间段</option>';
+        slots.forEach((slot,i)=>{
+            const open = isSlotOpen(slot);
+            const cnt = getSlotUsedCount(slot);
+            const full = cnt>=2;
+            let txt = open ? (full ? '已满员' : '可预约') : '当前时间不开放';
+            const div = document.createElement('div');
+            div.className = 'bg-white rounded-xl p-4 card-shadow';
+            div.innerHTML = `
+            <div class="flex justify-between"><b>${slot.day}</b><span class="text-sm text-gray-500">${slot.date}</span></div>
+            <div class="my-2">${slot.start} - ${slot.end}</div>
+            <div class="text-sm ${!open||full?'text-red-600':'text-green-600'}">${txt}</div>`;
+            c.appendChild(div);
+            if(open&&!full){
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `${slot.day} ${slot.date} ${slot.start}`;
+                s.appendChild(opt);
             }
         });
-        return `<tr>
-            <td class="p-2">${r.name}</td><td class="p-2">${r.mode}</td><td class="p-2">${r.rank}</td>
-            <td class="p-2">${oldTime}</td>
-            <td class="p-2"><select class="border p-1 text-sm edit-slot-${idx}">${options}</select></td>
+    }
+
+    function fillAdminSlotSelect(selId){
+        const sel = document.getElementById(selId);
+        const slots = generateWeekSlots();
+        sel.innerHTML = '';
+        slots.forEach((slot,i)=>{
+            if(isSlotOpen(slot)&&getSlotUsedCount(slot)<2){
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `${slot.day} ${slot.date} ${slot.start}`;
+                sel.appendChild(opt);
+            }
+        });
+    }
+
+    function showAdminPage(key){
+        document.querySelectorAll('.admin-page').forEach(el=>el.style.display='none');
+        if(key==='detail'){
+            document.getElementById('adminDetailPage').style.display='block';
+            renderAdminDetail();
+        }else if(key==='help'){
+            document.getElementById('adminHelpPage').style.display='block';
+            fillAdminSlotSelect('helpSlot');
+        }else if(key==='edit'){
+            document.getElementById('adminEditPage').style.display='block';
+            renderAdminEdit();
+        }else if(key==='user'){
+            document.getElementById('adminUserPage').style.display='block';
+            renderAdminUser();
+        }
+    }
+
+    function renderAdminDetail(){
+        const list = getData(GLOBAL_KEY_RESERVE);
+        const slots = generateWeekSlots();
+        const html = list.map((r,i)=>{
+            const slot = slots[r.slotIdx]||{};
+            const u = getUser(r.name);
+            const time = slot.day?`${slot.day} ${slot.date} ${slot.start}`:'已过期';
+            return `<tr>
+                <td class="p-2">${r.name}</td><td class="p-2">${u.level}</td>
+                <td class="p-2">${r.mode}</td><td class="p-2">${r.rank}</td><td class="p-2">${time}</td>
+            </tr>`;
+        }).join('')||'<tr><td colspan="5" class="p-2 text-center">暂无预约</td></tr>';
+        document.getElementById('adminDetailList').innerHTML = html;
+    }
+
+    function renderAdminEdit(){
+        const list = getData(GLOBAL_KEY_RESERVE);
+        const slots = generateWeekSlots();
+        const html = list.map((r,idx)=>{
+            const slot = slots[r.slotIdx]||{};
+            const oldTime = slot.day?`${slot.day} ${slot.start}`:'已过期';
+            let options = '';
+            slots.forEach((s,i)=>{
+                if(isSlotOpen(s)&&getSlotUsedCount(s)<2){
+                    options+=`<option value="${i}" ${r.slotIdx==i?'selected':''}>${s.day} ${s.start}</option>`;
+                }
+            });
+            return `<tr>
+                <td class="p-2">${r.name}</td><td class="p-2">${r.mode}</td><td class="p-2">${r.rank}</td>
+                <td class="p-2">${oldTime}</td>
+                <td class="p-2"><select class="border p-1 text-sm edit-slot-${idx}">${options}</select></td>
+                <td class="p-2">
+                    <button onclick="adminUpdateSlot(${idx})" class="text-blue-600 mr-2">保存</button>
+                    <button onclick="adminDeleteReserve(${idx})" class="text-red-600">删除</button>
+                </td>
+            </tr>`;
+        }).join('')||'<tr><td colspan="6" class="p-2 text-center">暂无预约</td></tr>';
+        document.getElementById('adminEditList').innerHTML = html;
+    }
+
+    window.adminUpdateSlot = function(idx){
+        const list = getData(GLOBAL_KEY_RESERVE);
+        const slots = generateWeekSlots();
+        const newSlotIdx = document.querySelector(`.edit-slot-${idx}`).value;
+        if(newSlotIdx==null) return showStatus('请选择时间段','error');
+        list[idx].slotIdx = parseInt(newSlotIdx);
+        list[idx].date = slots[newSlotIdx].date;
+        list[idx].start = slots[newSlotIdx].start;
+        setData(GLOBAL_KEY_RESERVE, list);
+        refreshAllViews();
+        showStatus('时间段已修改','success');
+    }
+
+    window.adminDeleteReserve = function(idx){
+        if(!confirm('确定删除？删除后不计入有效预约数')) return;
+        const list = getData(GLOBAL_KEY_RESERVE);
+        const deleted = list[idx];
+        list.splice(idx,1);
+        setData(GLOBAL_KEY_RESERVE, list);
+
+        let users = getData(GLOBAL_KEY_USERS);
+        let uidx = users.findIndex(x=>x.name===deleted.name);
+        if(uidx !== -1){
+            users[uidx].total = Math.max(0, users[uidx].total - 1);
+            updateAutoLevel(deleted.name);
+            setData(GLOBAL_KEY_USERS, users);
+        }
+
+        refreshAllViews();
+        showStatus('已删除，该预约不计入有效次数','success');
+    }
+
+    function renderAdminUser(){
+        let users = getData(GLOBAL_KEY_USERS);
+        users = users.filter(u=>u.name!=='楠小小风865370');
+        const html = users.map((u,idx)=>`
+        <tr>
+            <td class="p-2">${u.name}</td>
+            <td class="p-2">${u.total}</td>
+            <td class="p-2">${u.level}</td>
             <td class="p-2">
-                <button onclick="adminUpdateSlot(${idx})" class="text-blue-600 mr-2">保存</button>
-                <button onclick="adminDeleteReserve(${idx})" class="text-red-600">删除</button>
+                <select class="border p-1 user-level-${idx}" onchange="adminSetUserLevel(${idx},this.value)">
+                    <option value="普通用户" ${u.level==='普通用户'?'selected':''}>普通用户</option>
+                    <option value="高级用户" ${u.level==='高级用户'?'selected':''}>高级用户</option>
+                    <option value="VIP用户" ${u.level==='VIP用户'?'selected':''}>VIP用户</option>
+                    <option value="SVIP用户" ${u.level==='SVIP用户'?'selected':''}>SVIP用户</option>
+                </select>
             </td>
-        </tr>`;
-    }).join('')||'<tr><td colspan="6" class="p-2 text-center">暂无预约</td></tr>';
-    document.getElementById('adminEditList').innerHTML = html;
-}
+        </tr>`).join('')||'<tr><td colspan="4" class="p-2 text-center">暂无用户</td></tr>';
+        document.getElementById('adminUserList').innerHTML = html;
+    }
 
-window.adminUpdateSlot = async function(idx){
-    const newSlotIdx = document.querySelector(`.edit-slot-${idx}`).value;
-    if(newSlotIdx==null) return showStatus('请选择时间段','error');
-    await updateReserveSlot(idx, parseInt(newSlotIdx));
-    await refreshAllViews();
-    showStatus('时间段已修改','success');
-}
+    window.adminSetUserLevel = function(idx,newLevel){
+        let users = getData(GLOBAL_KEY_USERS);
+        const filtered = users.filter(u=>u.name!=='楠小小风865370');
+        const targetName = filtered[idx].name;
+        users = users.map(u=>{
+            if(u.name===targetName) u.level = newLevel;
+            return u;
+        });
+        setData(GLOBAL_KEY_USERS, users);
+        refreshAllViews();
+        showStatus('用户等级已修改','success');
+    }
 
-window.adminDeleteReserve = async function(idx){
-    if(!confirm('确定删除？删除后不计入有效预约数')) return;
-    await deleteReserve(idx);
-    await refreshAllViews();
-    showStatus('已删除，该预约不计入有效次数','success');
-}
-
-async function renderAdminUser(){
-    let users = await getUsers();
-    users = users.filter(u=>u.name!=='楠小小风865370');
-    const html = users.map((u,idx)=>`
-    <tr>
-        <td class="p-2">${u.name}</td>
-        <td class="p-2">${u.total}</td>
-        <td class="p-2">${u.level}</td>
-        <td class="p-2">
-            <select class="border p-1 user-level-${idx}" onchange="adminSetUserLevel(${idx},this.value)">
-                <option value="普通用户" ${u.level==='普通用户'?'selected':''}>普通用户</option>
-                <option value="高级用户" ${u.level==='高级用户'?'selected':''}>高级用户</option>
-                <option value="VIP用户" ${u.level==='VIP用户'?'selected':''}>VIP用户</option>
-                <option value="SVIP用户" ${u.level==='SVIP用户'?'selected':''}>SVIP用户</option>
-            </select>
-        </td>
-    </tr>`).join('')||'<tr><td colspan="4" class="p-2 text-center">暂无用户</td></tr>';
-    document.getElementById('adminUserList').innerHTML = html;
-}
-
-window.adminSetUserLevel = async function(idx,newLevel){
-    let users = await getUsers();
-    const filtered = users.filter(u=>u.name!=='楠小小风865370');
-    const targetName = filtered[idx].name;
-    await setUserLevel(targetName, newLevel);
-    await refreshAllViews();
-    showStatus('用户等级已修改','success');
-}
-
-function logout(){
-    localStorage.removeItem('loginUser');
-    document.getElementById('loginBox').classList.remove('hidden');
-    document.getElementById('userMain').classList.add('hidden');
-    document.getElementById('adminMain').classList.add('hidden');
-    document.getElementById('userInfo').classList.add('hidden');
-    document.getElementById('remainTip').classList.add('hidden');
-    document.getElementById('logoutBtn').classList.add('hidden');
-    showStatus('已退出登录','success');
-}
-
-document.getElementById('logoutBtn').onclick = logout;
-
-async function afterLogin(name){
-    document.getElementById('loginBox').classList.add('hidden');
-    document.getElementById('userInfo').classList.remove('hidden');
-    document.getElementById('logoutBtn').classList.remove('hidden');
-    document.getElementById('showName').textContent = name;
-
-    if(name==='楠小小风865370'){
-        document.getElementById('adminMain').classList.remove('hidden');
+    function logout(){
+        localStorage.removeItem('loginUser');
+        document.getElementById('loginBox').classList.remove('hidden');
         document.getElementById('userMain').classList.add('hidden');
-        document.getElementById('showLevel').textContent = '【管理员】';
+        document.getElementById('adminMain').classList.add('hidden');
+        document.getElementById('userInfo').classList.add('hidden');
+        document.getElementById('remainTip').classList.add('hidden');
+        document.getElementById('logoutBtn').classList.add('hidden');
+        showStatus('已退出登录','success');
+    }
+
+    document.getElementById('logoutBtn').onclick = logout;
+
+    function afterLogin(name){
+        document.getElementById('loginBox').classList.add('hidden');
+        document.getElementById('userInfo').classList.remove('hidden');
+        document.getElementById('logoutBtn').classList.remove('hidden');
+        document.getElementById('showName').textContent = name;
+
+        if(name==='楠小小风865370'){
+            document.getElementById('adminMain').classList.remove('hidden');
+            document.getElementById('userMain').classList.add('hidden');
+            document.getElementById('showLevel').textContent = '【管理员】';
+            showAdminPage('detail');
+            showStatus('欢迎管理员','success');
+            return;
+        }
+
+        document.getElementById('userMain').classList.remove('hidden');
+        document.getElementById('adminMain').classList.add('hidden');
+        const u = getUser(name);
+        document.getElementById('showLevel').textContent = u.level;
+        document.getElementById('userNick').value = name;
+        refreshAllViews();
+    }
+
+    document.getElementById('loginBtn').onclick = function(){
+        const name = document.getElementById('loginNick').value.trim();
+        if(!name) return showStatus('请输入昵称','error');
+        localStorage.setItem('loginUser',name);
+        afterLogin(name);
+    };
+
+    document.getElementById('userReserveForm').onsubmit = function(e){
+        e.preventDefault();
+        const name = document.getElementById('userNick').value.trim();
+        const mode = document.getElementById('userMode').value;
+        const rank = document.getElementById('userRank').value.trim();
+        const slotIdx = document.getElementById('userSlot').value;
+        if(!mode||!rank||slotIdx==='') return showStatus('信息不全','error');
+
+        const slots = generateWeekSlots();
+        const slot = slots[slotIdx];
+
+        if(hasUserReservedAtSlot(name, slot.date, slot.start)){
+            return showStatus('你已预约过该时间段，不可重复预约','error');
+        }
+
+        const week = getWeekStart();
+        const used = getWeekReserveCount(name);
+        const max = getMaxLimit(name);
+        if(used >= max) return showStatus(`本周上限(${used}/${max})`,'error');
+
+        if(!isSlotOpen(slot)) return showStatus('当前时间不开放','error');
+        if(getSlotUsedCount(slot)>=2) return showStatus('已满员','error');
+
+        let list = getData(GLOBAL_KEY_RESERVE);
+        list.push({name,mode,rank,slotIdx:parseInt(slotIdx),date:slot.date,start:slot.start,week});
+        setData(GLOBAL_KEY_RESERVE, list);
+
+        let users = getData(GLOBAL_KEY_USERS);
+        let user = users.find(x=>x.name===name);
+        if(user){ user.total++; updateAutoLevel(name); }
+        setData(GLOBAL_KEY_USERS, users);
+
+        refreshAllViews();
+        document.getElementById('successBox').classList.remove('hidden');
+    };
+
+    document.getElementById('adminHelpForm').onsubmit = function(e){
+        e.preventDefault();
+        const name = document.getElementById('helpNick').value.trim();
+        const mode = document.getElementById('helpMode').value;
+        const rank = document.getElementById('helpRank').value.trim();
+        const slotIdx = document.getElementById('helpSlot').value;
+        if(!name||!mode||!rank||slotIdx==='') return showStatus('请填写完整','error');
+
+        const slots = generateWeekSlots();
+        const slot = slots[slotIdx];
+
+        if(hasUserReservedAtSlot(name, slot.date, slot.start)){
+            return showStatus('该用户已预约过此时间段','error');
+        }
+
+        const week = getWeekStart();
+        const used = getWeekReserveCount(name);
+        const max = getMaxLimit(name);
+        if(used >= max) return showStatus(`该用户本周已达上限(${used}/${max})`,'error');
+
+        if(!isSlotOpen(slot)) return showStatus('当前时间不开放','error');
+        if(getSlotUsedCount(slot)>=2) return showStatus('已满员','error');
+
+        let list = getData(GLOBAL_KEY_RESERVE);
+        list.push({name,mode,rank,slotIdx:parseInt(slotIdx),date:slot.date,start:slot.start,week});
+        setData(GLOBAL_KEY_RESERVE, list);
+
+        let users = getData(GLOBAL_KEY_USERS);
+        let user = users.find(x=>x.name===name);
+        if(user){ user.total++; }
+        else users.push({name,level:'普通用户',total:1});
+        setData(GLOBAL_KEY_USERS, users);
+
+        document.getElementById('helpNick').value = '';
+        document.getElementById('helpRank').value = '';
+        fillAdminSlotSelect('helpSlot');
         showAdminPage('detail');
-        showStatus('欢迎管理员','success');
-        return;
-    }
+        document.getElementById('successBox').classList.remove('hidden');
+    };
 
-    document.getElementById('userMain').classList.remove('hidden');
-    document.getElementById('adminMain').classList.add('hidden');
-    const u = await getUser(name);
-    document.getElementById('showLevel').textContent = u.level;
-    document.getElementById('userNick').value = name;
-    await refreshAllViews();
-}
+    document.getElementById('successClose').onclick = function(){
+        document.getElementById('successBox').classList.add('hidden');
+    };
 
-document.getElementById('loginBtn').onclick = function(){
-    const name = document.getElementById('loginNick').value.trim();
-    if(!name) return showStatus('请输入昵称','error');
-    localStorage.setItem('loginUser',name);
-    afterLogin(name);
-};
-
-document.getElementById('userReserveForm').onsubmit = async function(e){
-    e.preventDefault();
-    const name = document.getElementById('userNick').value.trim();
-    const mode = document.getElementById('userMode').value;
-    const rank = document.getElementById('userRank').value.trim();
-    const slotIdx = document.getElementById('userSlot').value;
-    if(!mode||!rank||slotIdx==='') return showStatus('信息不全','error');
-
-    const slots = generateWeekSlots();
-    const slot = slots[slotIdx];
-
-    if(await hasUserReservedAtSlot(name, slot.date, slot.start)){
-        return showStatus('你已预约过该时间段，不可重复预约','error');
-    }
-
-    const week = getWeekStart();
-    const used = await getWeekReserveCount(name);
-    const max = await getMaxLimit(name);
-    if(used >= max) return showStatus(`本周上限(${used}/${max})`,'error');
-
-    if(!isSlotOpen(slot)) return showStatus('当前时间不开放','error');
-    if(await getSlotUsedCount(slot)>=2) return showStatus('已满员','error');
-
-    await addReserve({
-        name, mode, rank,
-        slotIdx: parseInt(slotIdx),
-        date: slot.date,
-        start: slot.start,
-        week
-    });
-
-    await refreshAllViews();
-    document.getElementById('successBox').classList.remove('hidden');
-};
-
-document.getElementById('adminHelpForm').onsubmit = async function(e){
-    e.preventDefault();
-    const name = document.getElementById('helpNick').value.trim();
-    const mode = document.getElementById('helpMode').value;
-    const rank = document.getElementById('helpRank').value.trim();
-    const slotIdx = document.getElementById('helpSlot').value;
-    if(!name||!mode||!rank||slotIdx==='') return showStatus('请填写完整','error');
-
-    const slots = generateWeekSlots();
-    const slot = slots[slotIdx];
-
-    if(await hasUserReservedAtSlot(name, slot.date, slot.start)){
-        return showStatus('该用户已预约过此时间段','error');
-    }
-
-    const week = getWeekStart();
-    const used = await getWeekReserveCount(name);
-    const max = await getMaxLimit(name);
-    if(used >= max) return showStatus(`该用户本周已达上限(${used}/${max})`,'error');
-
-    if(!isSlotOpen(slot)) return showStatus('当前时间不开放','error');
-    if(await getSlotUsedCount(slot)>=2) return showStatus('已满员','error');
-
-    await addReserve({
-        name, mode, rank,
-        slotIdx: parseInt(slotIdx),
-        date: slot.date,
-        start: slot.start,
-        week
-    });
-
-    document.getElementById('helpNick').value = '';
-    document.getElementById('helpRank').value = '';
-    await fillAdminSlotSelect('helpSlot');
-    showAdminPage('detail');
-    document.getElementById('successBox').classList.remove('hidden');
-};
-
-document.getElementById('successClose').onclick = function(){
-    document.getElementById('successBox').classList.add('hidden');
-};
-
-window.onload = async function(){
-    const user = localStorage.getItem('loginUser');
-    if(user) await afterLogin(user);
-    setInterval(async ()=>{
-        await refreshAllViews();
-    }, 3000);
-};
+    window.onload = function(){
+        const user = localStorage.getItem('loginUser');
+        if(user) afterLogin(user);
+        setInterval(refreshAllViews, 2000);
+    };
 </script>
 </body>
 </html>
